@@ -42,6 +42,7 @@ interface EditorState {
   currentTime: number;
   totalDuration: number;
   globalSettings: GlobalSettings;
+  projectName: string;
   
   addMediaItem: (item: MediaItem) => void;
   addClip: (clip: Clip) => void;
@@ -55,6 +56,9 @@ interface EditorState {
   setCurrentTime: (time: number) => void;
   updateTotalDuration: () => void;
   updateGlobalSettings: (settings: Partial<GlobalSettings>) => void;
+  setProjectName: (name: string) => void;
+  loadProject: (data: any) => void;
+  resetProject: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -71,6 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     videoFPS: 30,
     videoFormat: '16:9',
   },
+  projectName: 'Projeto Sem Título',
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
@@ -167,4 +172,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateGlobalSettings: (settings) => set((state) => ({
     globalSettings: { ...state.globalSettings, ...settings }
   })),
+
+  setProjectName: (name) => set({ projectName: name }),
+
+  loadProject: (data) => set({
+    mediaItems: data.mediaItems || [],
+    clips: data.clips || [],
+    globalSettings: data.globalSettings || get().globalSettings,
+    projectName: data.projectName || 'Projeto Importado',
+    selectedClipId: null,
+    selectedClipIds: [],
+    currentTime: 0,
+  }),
+
+  resetProject: () => set({
+    mediaItems: [],
+    clips: [],
+    selectedClipId: null,
+    selectedClipIds: [],
+    currentTime: 0,
+    totalDuration: 0,
+    projectName: 'Projeto Sem Título',
+  }),
 }));
