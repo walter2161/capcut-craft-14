@@ -48,6 +48,7 @@ interface EditorState {
   updateClip: (id: string, updates: Partial<Clip>) => void;
   removeClip: (id: string) => void;
   duplicateClip: (id: string) => void;
+  splitClip: (id: string, splitTime: number) => void;
   selectClip: (id: string | null, multiSelect?: boolean) => void;
   clearSelection: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -103,6 +104,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     
     return { clips: [...state.clips, newClip].sort((a, b) => a.start - b.start) };
+  }),
+
+  splitClip: (id, splitTime) => set((state) => {
+    const clipToSplit = state.clips.find(c => c.id === id);
+    if (!clipToSplit || splitTime <= clipToSplit.start || splitTime >= clipToSplit.start + clipToSplit.duration) {
+      return state;
+    }
+    
+    const firstPart = {
+      ...clipToSplit,
+      id: `clip-${Date.now()}-${Math.random()}-1`,
+      duration: splitTime - clipToSplit.start
+    };
+    
+    const secondPart = {
+      ...clipToSplit,
+      id: `clip-${Date.now()}-${Math.random()}-2`,
+      start: splitTime,
+      duration: (clipToSplit.start + clipToSplit.duration) - splitTime
+    };
+    
+    const newClips = state.clips
+      .filter(c => c.id !== id)
+      .concat([firstPart, secondPart])
+      .sort((a, b) => a.start - b.start);
+    
+    return { clips: newClips, selectedClipIds: [] };
   }),
 
   selectClip: (id, multiSelect = false) => set((state) => {

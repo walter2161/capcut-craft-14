@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Undo, Redo, Plus } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Scissors, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/store/editorStore";
 import { GlobalSettingsDialog } from "./GlobalSettingsDialog";
@@ -19,11 +19,13 @@ export const Timeline = () => {
     updateClip,
     updateTotalDuration,
     removeClip,
-    duplicateClip
+    duplicateClip,
+    splitClip
   } = useEditorStore();
 
   const [tracks, setTracks] = useState(['V1', 'A1']);
   const [zoom, setZoom] = useState(1);
+  const [cutMode, setCutMode] = useState(false);
 
   const animationRef = useRef<number>();
   const startTimeRef = useRef<number>(0);
@@ -206,12 +208,35 @@ export const Timeline = () => {
     selectedClipIds.forEach(id => duplicateClip(id));
   };
 
+  const handleSplitAtPlayhead = () => {
+    if (selectedClipIds.length === 0) return;
+    selectedClipIds.forEach(id => {
+      const clip = clips.find(c => c.id === id);
+      if (clip && currentTime > clip.start && currentTime < clip.start + clip.duration) {
+        splitClip(id, currentTime);
+      }
+    });
+  };
+
+  const skipBackward = () => {
+    setCurrentTime(Math.max(0, currentTime - 1000));
+    setIsPlaying(false);
+  };
+
+  const skipForward = () => {
+    setCurrentTime(Math.min(totalDuration, currentTime + 1000));
+    setIsPlaying(false);
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       handleDeleteSelected();
     } else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleDuplicateSelected();
+    } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSplitAtPlayhead();
     }
   };
 
@@ -222,64 +247,101 @@ export const Timeline = () => {
 
   return (
     <footer className="h-52 bg-[hsl(var(--timeline-bg))] border-t border-border flex flex-col">
-      <div className="h-12 flex items-center gap-3 px-4 border-b border-border">
-        <Button
-          onClick={togglePlayback}
-          variant="ghost"
-          size="sm"
-          disabled={clips.length === 0}
-          className="hover:bg-muted"
-        >
-          {isPlaying ? (
-            <Pause className="w-5 h-5 text-primary" />
-          ) : (
-            <Play className="w-5 h-5 text-primary" />
-          )}
-        </Button>
-
-        <Button variant="ghost" size="sm" disabled className="hover:bg-muted">
-          <Undo className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="sm" disabled className="hover:bg-muted">
-          <Redo className="w-4 h-4" />
-        </Button>
-
-        <div className="ml-6 flex items-center gap-6 text-sm">
-          <span>Tempo: <span className="font-mono font-semibold">{formatTime(currentTime)}</span></span>
-          <span>Duração: <span className="font-mono font-semibold">{formatTime(totalDuration)}</span></span>
-        </div>
-
-        <div className="ml-auto flex gap-2 items-center">
-          <div className="flex gap-1 items-center mr-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
-              className="h-7 w-7 p-0 hover:bg-muted"
-            >
-              -
-            </Button>
-            <span className="text-xs min-w-12 text-center">{(zoom * 100).toFixed(0)}%</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setZoom(Math.min(3, zoom + 0.25))}
-              className="h-7 w-7 p-0 hover:bg-muted"
-            >
-              +
-            </Button>
-          </div>
+      {/* Ferramentas de Edição */}
+      <div className="h-10 flex items-center justify-between gap-3 px-4 border-b border-border bg-[hsl(var(--editor-panel))]">
+        <div className="flex gap-2 items-center">
+          <Button
+            variant={cutMode ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setCutMode(!cutMode)}
+            className="hover:bg-muted"
+            title="Modo de corte (Ctrl+S para cortar no playhead)"
+          >
+            <Scissors className="w-4 h-4" />
+          </Button>
           {selectedClipIds.length > 0 && (
             <>
-              <Button variant="ghost" size="sm" onClick={handleDuplicateSelected} className="hover:bg-muted">
+              <Button variant="ghost" size="sm" onClick={handleSplitAtPlayhead} className="hover:bg-muted" title="Cortar no playhead (Ctrl+S)">
+                <Scissors className="w-4 h-4 mr-1" />
+                Cortar
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDuplicateSelected} className="hover:bg-muted" title="Duplicar (Ctrl+D)">
                 <i className="fas fa-copy w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="hover:bg-muted text-red-500">
+              <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="hover:bg-muted text-destructive" title="Deletar (Del)">
                 <i className="fas fa-trash w-4 h-4" />
               </Button>
             </>
           )}
-          <GlobalSettingsDialog />
+        </div>
+
+        <div className="flex gap-1 items-center">
+          <span className="text-xs mr-2">Zoom:</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+            className="h-6 w-6 p-0 hover:bg-muted"
+          >
+            -
+          </Button>
+          <span className="text-xs min-w-12 text-center">{(zoom * 100).toFixed(0)}%</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setZoom(Math.min(3, zoom + 0.25))}
+            className="h-6 w-6 p-0 hover:bg-muted"
+          >
+            +
+          </Button>
+        </div>
+
+        <GlobalSettingsDialog />
+      </div>
+
+      {/* Controles de Playback - Centralizados */}
+      <div className="h-12 flex items-center justify-center gap-3 px-4 border-b border-border relative">
+        <div className="absolute left-4 flex items-center gap-4 text-sm">
+          <span>Tempo: <span className="font-mono font-semibold">{formatTime(currentTime)}</span></span>
+          <span>Duração: <span className="font-mono font-semibold">{formatTime(totalDuration)}</span></span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={skipBackward}
+            variant="ghost"
+            size="sm"
+            disabled={clips.length === 0}
+            className="hover:bg-muted"
+            title="Retroceder 1s"
+          >
+            <SkipBack className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            onClick={togglePlayback}
+            variant="ghost"
+            size="sm"
+            disabled={clips.length === 0}
+            className="hover:bg-muted"
+          >
+            {isPlaying ? (
+              <Pause className="w-6 h-6 text-primary" />
+            ) : (
+              <Play className="w-6 h-6 text-primary" />
+            )}
+          </Button>
+
+          <Button
+            onClick={skipForward}
+            variant="ghost"
+            size="sm"
+            disabled={clips.length === 0}
+            className="hover:bg-muted"
+            title="Avançar 1s"
+          >
+            <SkipForward className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
@@ -316,8 +378,19 @@ export const Timeline = () => {
                         draggedClipRef.current = null;
                         dragOffsetRef.current = 0;
                       }}
-                      onClick={(e) => selectClip(clip.id, e.shiftKey)}
-                      className={`absolute h-10 top-2 rounded cursor-move transition-all overflow-hidden ${
+                      onClick={(e) => {
+                        if (cutMode) {
+                          // No modo de corte, clicar divide o clipe no playhead
+                          if (currentTime > clip.start && currentTime < clip.start + clip.duration) {
+                            splitClip(clip.id, currentTime);
+                          }
+                        } else {
+                          selectClip(clip.id, e.shiftKey);
+                        }
+                      }}
+                      className={`absolute h-10 top-2 rounded transition-all overflow-hidden ${
+                        cutMode ? 'cursor-crosshair' : 'cursor-move'
+                      } ${
                         selectedClipIds.includes(clip.id)
                           ? isVideoTrack 
                             ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary'

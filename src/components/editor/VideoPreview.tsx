@@ -230,13 +230,21 @@ export const VideoPreview = () => {
         </div>
       </div>
       <div className="relative w-full h-full flex items-center justify-center p-8">
-        <canvas
-          ref={canvasRef}
-          width={canvasDimensions.width}
-          height={canvasDimensions.height}
-          style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}
-          className="max-w-full max-h-full shadow-2xl"
-        />
+        <div className="relative" style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}>
+          <canvas
+            ref={canvasRef}
+            width={canvasDimensions.width}
+            height={canvasDimensions.height}
+            className="max-w-full max-h-full shadow-2xl"
+            style={{
+              border: '3px solid white',
+              boxShadow: '0 0 0 1px rgba(255,255,255,0.3)',
+            }}
+          />
+          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/70 px-2 py-1 rounded whitespace-nowrap">
+            {globalSettings.videoFormat}
+          </div>
+        </div>
         {clips.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-muted-foreground border border-dashed border-muted-foreground/30 rounded-lg p-8">
