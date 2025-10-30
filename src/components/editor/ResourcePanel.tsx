@@ -32,6 +32,9 @@ export const ResourcePanel = () => {
             });
             toast.success(`Imagem "${file.name}" adicionada`);
           };
+          img.onerror = () => {
+            toast.error(`Erro ao carregar "${file.name}"`);
+          };
           img.src = event.target?.result as string;
         };
         reader.readAsDataURL(file);
@@ -153,10 +156,19 @@ export const ResourcePanel = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="bg-muted hover:bg-muted/80 p-3 rounded cursor-move transition-colors flex items-center gap-2"
+                  className="bg-muted hover:bg-muted/80 rounded cursor-move transition-colors overflow-hidden"
                 >
-                  <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm truncate">{item.name}</span>
+                  {item.thumbnail && (
+                    <img 
+                      src={item.thumbnail} 
+                      alt={item.name}
+                      className="w-full h-20 object-cover"
+                    />
+                  )}
+                  <div className="p-2 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs truncate">{item.name}</span>
+                  </div>
                 </div>
               ))}
             </div>

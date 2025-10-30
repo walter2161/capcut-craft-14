@@ -26,6 +26,12 @@ export interface Clip {
   transitionDuration?: number;
 }
 
+export interface GlobalSettings {
+  defaultImageDuration: number;
+  defaultTransitionDuration: number;
+  videoFPS: number;
+}
+
 interface EditorState {
   mediaItems: MediaItem[];
   clips: Clip[];
@@ -33,6 +39,7 @@ interface EditorState {
   isPlaying: boolean;
   currentTime: number;
   totalDuration: number;
+  globalSettings: GlobalSettings;
   
   addMediaItem: (item: MediaItem) => void;
   addClip: (clip: Clip) => void;
@@ -42,6 +49,7 @@ interface EditorState {
   setIsPlaying: (playing: boolean) => void;
   setCurrentTime: (time: number) => void;
   updateTotalDuration: () => void;
+  updateGlobalSettings: (settings: Partial<GlobalSettings>) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -51,6 +59,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isPlaying: false,
   currentTime: 0,
   totalDuration: 0,
+  globalSettings: {
+    defaultImageDuration: 3000,
+    defaultTransitionDuration: 500,
+    videoFPS: 30,
+  },
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
@@ -84,4 +97,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
     return { totalDuration: duration };
   }),
+
+  updateGlobalSettings: (settings) => set((state) => ({
+    globalSettings: { ...state.globalSettings, ...settings }
+  })),
 }));
