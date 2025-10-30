@@ -45,10 +45,56 @@ export const Timeline = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, totalDuration]);
+  }, [isPlaying, totalDuration, setCurrentTime, setIsPlaying, currentTime]);
 
   const togglePlayback = () => {
     setIsPlaying(!isPlaying);
+  };
+
+  const handleTrackDrop = (e: React.DragEvent, track: string) => {
+    e.preventDefault();
+    const mediaId = e.dataTransfer.getData('mediaId');
+    const mediaType = e.dataTransfer.getData('mediaType');
+    
+    if (!mediaId || !mediaType) return;
+
+    const mediaItem = mediaItems.find(m => m.id === mediaId);
+    if (!mediaItem) return;
+
+    // Calcular a posição de drop baseada no mouse
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left - 80; // 80px é a largura do label
+    const dropTime = Math.max(0, offsetX * MS_PER_PIXEL);
+
+    // Adicionar o clipe na posição correta
+    addClipFromDrop(mediaItem, track, dropTime);
+  };
+
+  const addClipFromDrop = (mediaItem: any, track: string, startTime: number) => {
+    const { addClip, updateTotalDuration } = useEditorStore.getState();
+    
+    let duration = 3000;
+    if (mediaItem.type === 'audio' && mediaItem.duration) {
+      duration = mediaItem.duration;
+    }
+
+    const newClip = {
+      id: `clip-${Date.now()}-${Math.random()}`,
+      type: mediaItem.type,
+      mediaId: mediaItem.id,
+      track: track,
+      start: startTime,
+      duration: duration,
+      scale: 1.0,
+      brightness: 0,
+      contrast: 0,
+      volume: 1.0,
+      speed: 1.0,
+      opacity: 1.0,
+    };
+
+    addClip(newClip);
+    updateTotalDuration();
   };
 
   const formatTime = (ms: number) => {
@@ -98,7 +144,11 @@ export const Timeline = () => {
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden relative">
         {/* Track V1 - Video */}
-        <div className="h-14 flex bg-[hsl(var(--editor-panel))] mb-1 relative">
+        <div 
+          className="h-14 flex bg-[hsl(var(--editor-panel))] mb-1 relative"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleTrackDrop(e, 'V1')}
+        >
           <div className="w-20 min-w-20 flex items-center justify-center font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
             V1
           </div>
@@ -129,7 +179,11 @@ export const Timeline = () => {
         </div>
 
         {/* Track A1 - Audio */}
-        <div className="h-14 flex bg-[hsl(var(--editor-panel))] relative">
+        <div 
+          className="h-14 flex bg-[hsl(var(--editor-panel))] relative"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleTrackDrop(e, 'A1')}
+        >
           <div className="w-20 min-w-20 flex items-center justify-center font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
             A1
           </div>

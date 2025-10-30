@@ -15,13 +15,36 @@ export const VideoPreview = () => {
     renderFrame(ctx, currentTime);
   }, [currentTime, clips, mediaItems]);
 
+  const fitImageToCanvas = (img: any, canvas: HTMLCanvasElement) => {
+    const canvasRatio = canvas.width / canvas.height;
+    const imgRatio = img.width / img.height;
+    
+    let drawWidth, drawHeight, offsetX, offsetY;
+    
+    if (imgRatio > canvasRatio) {
+      drawWidth = canvas.width;
+      drawHeight = drawWidth / imgRatio;
+      offsetX = 0;
+      offsetY = (canvas.height - drawHeight) / 2;
+    } else {
+      drawHeight = canvas.height;
+      drawWidth = imgRatio * drawHeight;
+      offsetX = (canvas.width - drawWidth) / 2;
+      offsetY = 0;
+    }
+    
+    return { drawWidth, drawHeight, offsetX, offsetY };
+  };
+
   const renderFrame = (ctx: CanvasRenderingContext2D, time: number) => {
     const canvas = ctx.canvas;
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const currentClip = clips.find(
-      c => c.track === 'V1' && c.start <= time && c.start + c.duration > time
+    const videoClips = clips.filter(c => c.track === 'V1').sort((a, b) => a.start - b.start);
+    
+    const currentClip = videoClips.find(
+      c => c.start <= time && c.start + c.duration > time
     );
 
     if (!currentClip) return;
@@ -30,26 +53,53 @@ export const VideoPreview = () => {
     if (!mediaItem || !mediaItem.data) return;
 
     const image = mediaItem.data;
+    const timeInClip = time - currentClip.start;
+    const transitionDuration = currentClip.transitionDuration || 500;
     
-    // Aplicar filtros
-    ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
-    ctx.globalAlpha = currentClip.opacity;
-
-    // Calcular dimensões para cover fit
-    const imgRatio = image.width / image.height;
-    const canvasRatio = canvas.width / canvas.height;
-
-    let drawWidth, drawHeight;
-    if (imgRatio < canvasRatio) {
-      drawWidth = canvas.width;
-      drawHeight = drawWidth / imgRatio;
-    } else {
-      drawHeight = canvas.height;
-      drawWidth = drawHeight * imgRatio;
+    // Verificar se há um clipe seguinte para transição
+    const currentIndex = videoClips.indexOf(currentClip);
+    const nextClip = currentIndex < videoClips.length - 1 ? videoClips[currentIndex + 1] : null;
+    
+    let alpha = currentClip.opacity;
+    
+    // Lógica de transição cross-fade
+    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
+      const transitionStart = currentClip.duration - transitionDuration;
+      
+      if (timeInClip >= transitionStart) {
+        const transitionTime = timeInClip - transitionStart;
+        const transitionProgress = transitionTime / transitionDuration;
+        
+        // Desenhar a próxima imagem (fundo)
+        const nextMediaItem = mediaItems.find(m => m.id === nextClip.mediaId);
+        if (nextMediaItem && nextMediaItem.data) {
+          const nextImage = nextMediaItem.data;
+          const nextImgProps = fitImageToCanvas(nextImage, canvas);
+          
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+          
+          const nextScaledWidth = nextImgProps.drawWidth * nextClip.scale;
+          const nextScaledHeight = nextImgProps.drawHeight * nextClip.scale;
+          const nextOffsetX = (canvas.width - nextScaledWidth) / 2;
+          const nextOffsetY = (canvas.height - nextScaledHeight) / 2;
+          
+          ctx.drawImage(nextImage, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
+        }
+        
+        // Ajustar alpha da imagem atual para fade out
+        alpha = (1 - transitionProgress) * currentClip.opacity;
+      }
     }
+    
+    // Desenhar a imagem atual
+    const imgProps = fitImageToCanvas(image, canvas);
+    
+    ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
+    ctx.globalAlpha = alpha;
 
-    const scaledWidth = drawWidth * currentClip.scale;
-    const scaledHeight = drawHeight * currentClip.scale;
+    const scaledWidth = imgProps.drawWidth * currentClip.scale;
+    const scaledHeight = imgProps.drawHeight * currentClip.scale;
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2;
 

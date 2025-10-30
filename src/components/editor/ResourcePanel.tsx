@@ -63,22 +63,37 @@ export const ResourcePanel = () => {
     const track = item.type === 'audio' ? 'A1' : 'V1';
     const duration = item.type === 'audio' ? item.duration : 3000;
     
+    // Encontrar a última posição na trilha
+    const clipsInTrack = useEditorStore.getState().clips.filter(c => c.track === track);
+    const lastPosition = clipsInTrack.reduce((max, clip) => 
+      Math.max(max, clip.start + clip.duration), 0
+    );
+    
     addClip({
       id: `clip-${Date.now()}`,
       type: item.type,
       mediaId: item.id,
       track,
-      start: 0,
+      start: lastPosition,
       duration,
       scale: 1,
       brightness: 0,
       contrast: 0,
       volume: 1,
       speed: 1,
-      opacity: 1
+      opacity: 1,
+      transition: 'cross-fade',
+      transitionDuration: 500
     });
     
+    useEditorStore.getState().updateTotalDuration();
     toast.success(`Adicionado à linha do tempo`);
+  };
+
+  const handleDragStart = (e: React.DragEvent, item: any) => {
+    e.dataTransfer.setData('mediaId', item.id);
+    e.dataTransfer.setData('mediaType', item.type);
+    e.dataTransfer.effectAllowed = 'copy';
   };
 
   const images = mediaItems.filter(m => m.type === 'image');
@@ -135,8 +150,10 @@ export const ResourcePanel = () => {
               {images.map((item) => (
                 <div
                   key={item.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="bg-muted hover:bg-muted/80 p-3 rounded cursor-pointer transition-colors flex items-center gap-2"
+                  className="bg-muted hover:bg-muted/80 p-3 rounded cursor-move transition-colors flex items-center gap-2"
                 >
                   <ImageIcon className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm truncate">{item.name}</span>
@@ -168,8 +185,10 @@ export const ResourcePanel = () => {
               {audios.map((item) => (
                 <div
                   key={item.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="bg-muted hover:bg-muted/80 p-3 rounded cursor-pointer transition-colors flex items-center gap-2"
+                  className="bg-muted hover:bg-muted/80 p-3 rounded cursor-move transition-colors flex items-center gap-2"
                 >
                   <Music className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm truncate">{item.name}</span>

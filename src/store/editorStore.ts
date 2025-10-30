@@ -22,6 +22,8 @@ export interface Clip {
   volume: number;
   speed: number;
   opacity: number;
+  transition?: 'cross-fade' | 'none';
+  transitionDuration?: number;
 }
 
 interface EditorState {

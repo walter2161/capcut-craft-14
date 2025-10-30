@@ -95,18 +95,51 @@ export const PropertiesPanel = () => {
 
           <div>
             <h4 className="font-medium mb-4">Duração</h4>
-            <div>
-              <div className="flex justify-between mb-2">
-                <Label className="text-sm">Duração (ms)</Label>
-                <span className="text-sm font-semibold">{selectedClip.duration}ms</span>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Duração (ms)</Label>
+                  <span className="text-sm font-semibold">{selectedClip.duration}ms</span>
+                </div>
+                <Slider
+                  value={[selectedClip.duration]}
+                  onValueChange={(v) => handleChange('duration', v)}
+                  min={500}
+                  max={10000}
+                  step={100}
+                />
               </div>
-              <Slider
-                value={[selectedClip.duration]}
-                onValueChange={(v) => handleChange('duration', v)}
-                min={500}
-                max={10000}
-                step={100}
-              />
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Transição</Label>
+                  <span className="text-sm font-semibold">
+                    {selectedClip.transition === 'cross-fade' ? 'Cross Fade' : 'Nenhuma'}
+                  </span>
+                </div>
+                <select
+                  value={selectedClip.transition || 'cross-fade'}
+                  onChange={(e) => updateClip(selectedClip.id, { transition: e.target.value as any })}
+                  className="w-full p-2 rounded bg-background border border-border"
+                >
+                  <option value="cross-fade">Cross Fade</option>
+                  <option value="none">Nenhuma</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Duração Transição (ms)</Label>
+                  <span className="text-sm font-semibold">{selectedClip.transitionDuration || 500}ms</span>
+                </div>
+                <Slider
+                  value={[selectedClip.transitionDuration || 500]}
+                  onValueChange={(v) => handleChange('transitionDuration', v)}
+                  min={100}
+                  max={2000}
+                  step={100}
+                />
+              </div>
             </div>
           </div>
         </div>
