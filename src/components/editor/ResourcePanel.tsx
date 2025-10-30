@@ -8,7 +8,7 @@ type TabType = 'media' | 'video' | 'audio';
 
 export const ResourcePanel = () => {
   const [activeTab, setActiveTab] = useState<TabType>('media');
-  const { mediaItems, addMediaItem, addClip } = useEditorStore();
+  const { mediaItems, addMediaItem, removeMediaItem, addClip } = useEditorStore();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -199,7 +199,7 @@ export const ResourcePanel = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="relative bg-muted hover:bg-muted/80 rounded cursor-move transition-colors overflow-hidden"
+                  className="relative bg-muted hover:bg-muted/80 rounded cursor-move transition-colors overflow-hidden group"
                 >
                   {item.thumbnail && (
                     <img 
@@ -211,6 +211,17 @@ export const ResourcePanel = () => {
                   <div className="absolute top-1 right-1 bg-blue-500 text-white text-[10px] px-1 rounded">
                     IMG
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeMediaItem(item.id);
+                      toast.success(`"${item.name}" removido`);
+                    }}
+                    className="absolute top-1 left-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                    title="Deletar mídia"
+                  >
+                    ×
+                  </button>
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] p-1 truncate">
                     {item.name}
                   </div>
@@ -246,7 +257,7 @@ export const ResourcePanel = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="relative bg-muted hover:bg-muted/80 rounded cursor-move transition-colors overflow-hidden"
+                  className="relative bg-muted hover:bg-muted/80 rounded cursor-move transition-colors overflow-hidden group"
                 >
                   {item.thumbnail && (
                     <img 
@@ -258,6 +269,17 @@ export const ResourcePanel = () => {
                   <div className="absolute top-1 right-1 bg-purple-500 text-white text-[10px] px-1 rounded">
                     VID
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeMediaItem(item.id);
+                      toast.success(`"${item.name}" removido`);
+                    }}
+                    className="absolute top-1 left-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                    title="Deletar mídia"
+                  >
+                    ×
+                  </button>
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] p-1 truncate">
                     {item.name}
                   </div>
@@ -293,7 +315,7 @@ export const ResourcePanel = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => handleAddToTimeline(item)}
-                  className="bg-muted hover:bg-muted/80 p-2 rounded cursor-move transition-colors flex items-center gap-2"
+                  className="bg-muted hover:bg-muted/80 p-2 rounded cursor-move transition-colors flex items-center gap-2 group relative"
                 >
                   <div className="relative">
                     <Music className="w-6 h-6 text-muted-foreground" />
@@ -309,6 +331,17 @@ export const ResourcePanel = () => {
                       </p>
                     )}
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeMediaItem(item.id);
+                      toast.success(`"${item.name}" removido`);
+                    }}
+                    className="bg-red-500 text-white text-xs w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600 shrink-0"
+                    title="Deletar mídia"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>

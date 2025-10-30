@@ -45,6 +45,7 @@ interface EditorState {
   projectName: string;
   
   addMediaItem: (item: MediaItem) => void;
+  removeMediaItem: (id: string) => void;
   addClip: (clip: Clip) => void;
   updateClip: (id: string, updates: Partial<Clip>) => void;
   removeClip: (id: string) => void;
@@ -79,6 +80,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
+  })),
+
+  removeMediaItem: (id) => set((state) => ({
+    mediaItems: state.mediaItems.filter(item => item.id !== id),
+    clips: state.clips.filter(clip => clip.mediaId !== id),
   })),
 
   addClip: (clip) => set((state) => {

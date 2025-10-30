@@ -25,7 +25,6 @@ export const Timeline = () => {
 
   const [tracks, setTracks] = useState(['V1', 'A1']);
   const [zoom, setZoom] = useState(1);
-  const [cutMode, setCutMode] = useState(false);
 
   const animationRef = useRef<number>();
   const startTimeRef = useRef<number>(0);
@@ -250,15 +249,6 @@ export const Timeline = () => {
       {/* Ferramentas de Edição */}
       <div className="h-10 flex items-center justify-between gap-3 px-4 border-b border-border bg-[hsl(var(--editor-panel))]">
         <div className="flex gap-2 items-center">
-          <Button
-            variant={cutMode ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setCutMode(!cutMode)}
-            className="hover:bg-muted"
-            title="Modo de corte (Ctrl+S para cortar no playhead)"
-          >
-            <Scissors className="w-4 h-4" />
-          </Button>
           {selectedClipIds.length > 0 && (
             <>
               <Button variant="ghost" size="sm" onClick={handleSplitAtPlayhead} className="hover:bg-muted" title="Cortar no playhead (Ctrl+S)">
@@ -379,18 +369,10 @@ export const Timeline = () => {
                         dragOffsetRef.current = 0;
                       }}
                       onClick={(e) => {
-                        if (cutMode) {
-                          // No modo de corte, clicar divide o clipe no playhead
-                          if (currentTime > clip.start && currentTime < clip.start + clip.duration) {
-                            splitClip(clip.id, currentTime);
-                          }
-                        } else {
-                          selectClip(clip.id, e.shiftKey);
-                        }
+                        e.stopPropagation();
+                        selectClip(clip.id, e.shiftKey);
                       }}
-                      className={`absolute h-10 top-2 rounded transition-all overflow-hidden ${
-                        cutMode ? 'cursor-crosshair' : 'cursor-move'
-                      } ${
+                      className={`absolute h-10 top-2 rounded transition-all overflow-hidden cursor-move group ${
                         selectedClipIds.includes(clip.id)
                           ? isVideoTrack 
                             ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary'
@@ -411,8 +393,18 @@ export const Timeline = () => {
                           className="absolute inset-0 w-full h-full object-cover opacity-30"
                         />
                       )}
-                      <div className="px-2 text-xs text-white truncate leading-10 relative z-10">
-                        {mediaItem?.name || 'Clip'}
+                      <div className="px-2 text-xs text-white truncate leading-10 relative z-10 flex items-center justify-between">
+                        <span className="truncate flex-1">{mediaItem?.name || 'Clip'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeClip(clip.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 hover:text-red-500"
+                          title="Deletar clip"
+                        >
+                          ×
+                        </button>
                       </div>
                     </div>
                   );
