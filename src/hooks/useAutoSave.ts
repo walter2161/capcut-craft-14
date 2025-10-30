@@ -43,16 +43,45 @@ export const useAutoSave = () => {
 
   // Save to localStorage when state changes
   useEffect(() => {
+    // Remove binary data from mediaItems to avoid quota issues
+    const mediaItemsWithoutData = mediaItems.map(item => ({
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      duration: item.duration,
+      thumbnail: item.thumbnail,
+      // Omit 'data' property which contains large binary data
+    }));
+
     const data = {
-      mediaItems,
+      mediaItems: mediaItemsWithoutData,
       clips,
       globalSettings,
     };
 
     const expiryTime = Date.now() + (EXPIRY_HOURS * 60 * 60 * 1000);
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    localStorage.setItem(EXPIRY_KEY, expiryTime.toString());
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(EXPIRY_KEY, expiryTime.toString());
+    } catch (error) {
+      // If quota exceeded or other error, clear old data and try again with minimal data
+      console.warn('Failed to save to localStorage:', error);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(EXPIRY_KEY);
+        // Try saving only clips and settings (most important for recovery)
+        const minimalData = {
+          clips,
+          globalSettings,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalData));
+        localStorage.setItem(EXPIRY_KEY, expiryTime.toString());
+      } catch (retryError) {
+        console.error('Could not save even minimal data:', retryError);
+        // Silently fail - don't crash the app
+      }
+    }
   }, [mediaItems, clips, globalSettings]);
 
   return null;
