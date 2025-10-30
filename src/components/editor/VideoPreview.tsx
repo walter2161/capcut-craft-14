@@ -1,12 +1,14 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useEditorStore } from "@/store/editorStore";
+import { Button } from "@/components/ui/button";
 
 export const VideoPreview = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const { clips, mediaItems, currentTime, isPlaying } = useEditorStore();
+  const { clips, mediaItems, currentTime, isPlaying, globalSettings } = useEditorStore();
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -188,8 +190,6 @@ export const VideoPreview = () => {
     ctx.globalAlpha = 1;
   };
 
-  const { globalSettings } = useEditorStore();
-  
   // Calcular dimensões do canvas baseado no formato
   const getCanvasDimensions = () => {
     switch (globalSettings.videoFormat) {
@@ -207,11 +207,34 @@ export const VideoPreview = () => {
 
   return (
     <section className="flex-1 bg-black flex items-center justify-center relative">
+      <div className="absolute top-4 right-4 z-10 flex gap-2 items-center bg-black/70 px-3 py-2 rounded-lg backdrop-blur-sm">
+        <span className="text-white text-sm font-semibold">{globalSettings.videoFormat}</span>
+        <div className="flex gap-1 items-center border-l border-white/20 pl-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
+            className="h-6 w-6 p-0 text-white hover:bg-white/20"
+          >
+            -
+          </Button>
+          <span className="text-white text-xs min-w-10 text-center">{(zoom * 100).toFixed(0)}%</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setZoom(Math.min(2, zoom + 0.25))}
+            className="h-6 w-6 p-0 text-white hover:bg-white/20"
+          >
+            +
+          </Button>
+        </div>
+      </div>
       <div className="relative w-full h-full flex items-center justify-center p-8">
         <canvas
           ref={canvasRef}
           width={canvasDimensions.width}
           height={canvasDimensions.height}
+          style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}
           className="max-w-full max-h-full shadow-2xl"
         />
         {clips.length === 0 && (

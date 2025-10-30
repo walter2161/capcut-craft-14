@@ -5,8 +5,11 @@ import { VideoPreview } from "@/components/editor/VideoPreview";
 import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
 import { Timeline } from "@/components/editor/Timeline";
 import { useEditorStore } from "@/store/editorStore";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 const VideoEditor = () => {
+  useAutoSave();
+  
   return (
     <div className="h-screen flex flex-col bg-[hsl(var(--editor-bg))]">
       <EditorHeader />
