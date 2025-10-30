@@ -30,12 +30,14 @@ export interface GlobalSettings {
   defaultImageDuration: number;
   defaultTransitionDuration: number;
   videoFPS: number;
+  videoFormat: '16:9' | '9:16' | '1:1';
 }
 
 interface EditorState {
   mediaItems: MediaItem[];
   clips: Clip[];
   selectedClipId: string | null;
+  selectedClipIds: string[];
   isPlaying: boolean;
   currentTime: number;
   totalDuration: number;
@@ -45,7 +47,9 @@ interface EditorState {
   addClip: (clip: Clip) => void;
   updateClip: (id: string, updates: Partial<Clip>) => void;
   removeClip: (id: string) => void;
-  selectClip: (id: string | null) => void;
+  duplicateClip: (id: string) => void;
+  selectClip: (id: string | null, multiSelect?: boolean) => void;
+  clearSelection: () => void;
   setIsPlaying: (playing: boolean) => void;
   setCurrentTime: (time: number) => void;
   updateTotalDuration: () => void;
@@ -56,6 +60,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mediaItems: [],
   clips: [],
   selectedClipId: null,
+  selectedClipIds: [],
   isPlaying: false,
   currentTime: 0,
   totalDuration: 0,
@@ -63,6 +68,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     defaultImageDuration: 3000,
     defaultTransitionDuration: 500,
     videoFPS: 30,
+    videoFormat: '16:9',
   },
 
   addMediaItem: (item) => set((state) => ({ 
@@ -82,10 +88,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   removeClip: (id) => set((state) => ({
     clips: state.clips.filter(clip => clip.id !== id),
-    selectedClipId: state.selectedClipId === id ? null : state.selectedClipId
+    selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
+    selectedClipIds: state.selectedClipIds.filter(clipId => clipId !== id)
   })),
 
-  selectClip: (id) => set({ selectedClipId: id }),
+  duplicateClip: (id) => set((state) => {
+    const clipToDuplicate = state.clips.find(c => c.id === id);
+    if (!clipToDuplicate) return state;
+    
+    const newClip = {
+      ...clipToDuplicate,
+      id: `clip-${Date.now()}-${Math.random()}`,
+      start: clipToDuplicate.start + clipToDuplicate.duration
+    };
+    
+    return { clips: [...state.clips, newClip].sort((a, b) => a.start - b.start) };
+  }),
+
+  selectClip: (id, multiSelect = false) => set((state) => {
+    if (!id) {
+      return { selectedClipId: null, selectedClipIds: [] };
+    }
+    
+    if (multiSelect) {
+      const isSelected = state.selectedClipIds.includes(id);
+      return {
+        selectedClipId: id,
+        selectedClipIds: isSelected 
+          ? state.selectedClipIds.filter(clipId => clipId !== id)
+          : [...state.selectedClipIds, id]
+      };
+    }
+    
+    return { selectedClipId: id, selectedClipIds: [id] };
+  }),
+
+  clearSelection: () => set({ selectedClipId: null, selectedClipIds: [] }),
 
   setIsPlaying: (playing) => set({ isPlaying: playing }),
 

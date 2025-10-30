@@ -3,6 +3,9 @@ import { useEditorStore } from "@/store/editorStore";
 
 export const VideoPreview = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const { clips, mediaItems, currentTime, isPlaying } = useEditorStore();
 
   useEffect(() => {
@@ -13,7 +16,84 @@ export const VideoPreview = () => {
     if (!ctx) return;
 
     renderFrame(ctx, currentTime);
-  }, [currentTime, clips, mediaItems]);
+    
+    // Gerenciar reprodução de áudio
+    if (isPlaying) {
+      playAudio(currentTime);
+    } else {
+      stopAudio();
+    }
+  }, [currentTime, clips, mediaItems, isPlaying]);
+
+  const playAudio = (time: number) => {
+    const audioClips = clips.filter(c => c.track === 'A1');
+    const currentAudioClip = audioClips.find(
+      c => c.start <= time && c.start + c.duration > time
+    );
+
+    if (!currentAudioClip) {
+      stopAudio();
+      return;
+    }
+
+    const mediaItem = mediaItems.find(m => m.id === currentAudioClip.mediaId);
+    if (!mediaItem || !mediaItem.data) return;
+
+    // Inicializar AudioContext se necessário
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    const audioContext = audioContextRef.current;
+    
+    // Se já está tocando o mesmo clipe, não reiniciar
+    if (audioSourceRef.current && audioSourceRef.current.buffer === mediaItem.data) {
+      return;
+    }
+
+    // Parar áudio anterior
+    stopAudio();
+
+    try {
+      // Criar novo source
+      const source = audioContext.createBufferSource();
+      source.buffer = mediaItem.data;
+      
+      // Criar gain node para controle de volume
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = currentAudioClip.volume;
+      
+      // Conectar nodes
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Calcular offset do áudio
+      const timeInClip = (time - currentAudioClip.start) / 1000;
+      const offset = Math.max(0, timeInClip / currentAudioClip.speed);
+      
+      // Aplicar velocidade
+      source.playbackRate.value = currentAudioClip.speed;
+      
+      // Iniciar reprodução
+      source.start(0, offset);
+      
+      audioSourceRef.current = source;
+      gainNodeRef.current = gainNode;
+    } catch (error) {
+      console.error('Erro ao reproduzir áudio:', error);
+    }
+  };
+
+  const stopAudio = () => {
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.stop();
+      } catch (e) {
+        // Ignorar erro se já parado
+      }
+      audioSourceRef.current = null;
+    }
+  };
 
   const fitImageToCanvas = (img: any, canvas: HTMLCanvasElement) => {
     const canvasRatio = canvas.width / canvas.height;
@@ -108,13 +188,30 @@ export const VideoPreview = () => {
     ctx.globalAlpha = 1;
   };
 
+  const { globalSettings } = useEditorStore();
+  
+  // Calcular dimensões do canvas baseado no formato
+  const getCanvasDimensions = () => {
+    switch (globalSettings.videoFormat) {
+      case '9:16':
+        return { width: 720, height: 1280 };
+      case '1:1':
+        return { width: 1080, height: 1080 };
+      case '16:9':
+      default:
+        return { width: 1280, height: 720 };
+    }
+  };
+
+  const canvasDimensions = getCanvasDimensions();
+
   return (
     <section className="flex-1 bg-black flex items-center justify-center relative">
       <div className="relative w-full h-full flex items-center justify-center p-8">
         <canvas
           ref={canvasRef}
-          width={1280}
-          height={720}
+          width={canvasDimensions.width}
+          height={canvasDimensions.height}
           className="max-w-full max-h-full shadow-2xl"
         />
         {clips.length === 0 && (

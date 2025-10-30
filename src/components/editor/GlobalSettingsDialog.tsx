@@ -33,6 +33,42 @@ export const GlobalSettingsDialog = () => {
         <div className="space-y-6 py-4">
           <div>
             <div className="flex justify-between mb-2">
+              <Label className="text-sm">Formato do Vídeo</Label>
+              <span className="text-sm font-semibold">{globalSettings.videoFormat}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={globalSettings.videoFormat === '16:9' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateGlobalSettings({ videoFormat: '16:9' })}
+                className="flex-1"
+              >
+                16:9
+              </Button>
+              <Button
+                variant={globalSettings.videoFormat === '9:16' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateGlobalSettings({ videoFormat: '9:16' })}
+                className="flex-1"
+              >
+                9:16
+              </Button>
+              <Button
+                variant={globalSettings.videoFormat === '1:1' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateGlobalSettings({ videoFormat: '1:1' })}
+                className="flex-1"
+              >
+                1:1
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Proporção de aspecto do vídeo exportado
+            </p>
+          </div>
+
+          <div>
+            <div className="flex justify-between mb-2">
               <Label className="text-sm">Duração Padrão de Imagem (ms)</Label>
               <span className="text-sm font-semibold">{globalSettings.defaultImageDuration}ms</span>
             </div>

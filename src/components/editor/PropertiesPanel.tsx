@@ -1,9 +1,10 @@
 import { useEditorStore } from "@/store/editorStore";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 
 export const PropertiesPanel = () => {
-  const { selectedClipId, clips, updateClip } = useEditorStore();
+  const { selectedClipId, selectedClipIds, clips, updateClip, removeClip, duplicateClip } = useEditorStore();
   const selectedClip = clips.find(c => c.id === selectedClipId);
 
   if (!selectedClip) {
@@ -23,11 +24,33 @@ export const PropertiesPanel = () => {
     updateClip(selectedClip.id, { [property]: value[0] });
   };
 
+  const handleDelete = () => {
+    if (selectedClipId) {
+      removeClip(selectedClipId);
+    }
+  };
+
+  const handleDuplicate = () => {
+    if (selectedClipId) {
+      duplicateClip(selectedClipId);
+    }
+  };
+
   return (
     <aside className="w-72 bg-[hsl(var(--editor-panel))] border-l border-border p-4 overflow-y-auto">
-      <h3 className="text-lg font-semibold mb-4 pb-2 border-b-2 border-primary">
-        🎥 Propriedades do Clipe
-      </h3>
+      <div className="flex items-center justify-between mb-4 pb-2 border-b-2 border-primary">
+        <h3 className="text-lg font-semibold">🎥 Propriedades</h3>
+        {selectedClipIds.length > 0 && (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={handleDuplicate}>
+              <i className="fas fa-copy" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleDelete} className="text-red-500">
+              <i className="fas fa-trash" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {(selectedClip.type === 'image' || selectedClip.type === 'video') && (
         <div className="space-y-6">

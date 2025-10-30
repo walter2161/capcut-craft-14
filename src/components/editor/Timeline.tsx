@@ -12,11 +12,14 @@ export const Timeline = () => {
     totalDuration,
     selectClip,
     selectedClipId,
+    selectedClipIds,
     setIsPlaying,
     setCurrentTime,
     mediaItems,
     updateClip,
-    updateTotalDuration
+    updateTotalDuration,
+    removeClip,
+    duplicateClip
   } = useEditorStore();
 
   const animationRef = useRef<number>();
@@ -55,7 +58,9 @@ export const Timeline = () => {
   };
 
   const draggedClipRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef<number>(0);
   const playheadDragRef = useRef(false);
+  const SNAP_THRESHOLD = 50; // pixels para snap magnético
 
   const handleTrackDrop = (e: React.DragEvent, track: string) => {
     e.preventDefault();
@@ -69,12 +74,39 @@ export const Timeline = () => {
       if (!clip) return;
       
       const rect = e.currentTarget.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left - 80;
-      const dropTime = Math.max(0, offsetX * MS_PER_PIXEL);
+      const offsetX = e.clientX - rect.left - 80 - dragOffsetRef.current;
+      let dropTime = Math.max(0, offsetX * MS_PER_PIXEL);
+      
+      // Snap magnético: colar em outros clipes próximos
+      const otherClips = clips.filter(c => c.id !== clipId && c.track === track);
+      for (const otherClip of otherClips) {
+        const otherStart = otherClip.start;
+        const otherEnd = otherClip.start + otherClip.duration;
+        
+        // Snap ao início do outro clipe
+        if (Math.abs(dropTime - otherStart) < SNAP_THRESHOLD * MS_PER_PIXEL) {
+          dropTime = otherStart;
+          break;
+        }
+        
+        // Snap ao final do outro clipe
+        if (Math.abs(dropTime - otherEnd) < SNAP_THRESHOLD * MS_PER_PIXEL) {
+          dropTime = otherEnd;
+          break;
+        }
+        
+        // Snap do final do clipe atual ao início do outro
+        const clipEnd = dropTime + clip.duration;
+        if (Math.abs(clipEnd - otherStart) < SNAP_THRESHOLD * MS_PER_PIXEL) {
+          dropTime = otherStart - clip.duration;
+          break;
+        }
+      }
       
       updateClip(clipId, { start: dropTime, track });
       updateTotalDuration();
       draggedClipRef.current = null;
+      dragOffsetRef.current = 0;
       return;
     }
     
@@ -165,6 +197,28 @@ export const Timeline = () => {
   const videoClips = clips.filter(c => c.track === 'V1');
   const audioClips = clips.filter(c => c.track === 'A1');
 
+  const handleDeleteSelected = () => {
+    selectedClipIds.forEach(id => removeClip(id));
+  };
+
+  const handleDuplicateSelected = () => {
+    selectedClipIds.forEach(id => duplicateClip(id));
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      handleDeleteSelected();
+    } else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleDuplicateSelected();
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedClipIds]);
+
   return (
     <footer className="h-52 bg-[hsl(var(--timeline-bg))] border-t border-border flex flex-col">
       <div className="h-12 flex items-center gap-3 px-4 border-b border-border">
@@ -194,7 +248,17 @@ export const Timeline = () => {
           <span>Duração: <span className="font-mono font-semibold">{formatTime(totalDuration)}</span></span>
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          {selectedClipIds.length > 0 && (
+            <>
+              <Button variant="ghost" size="sm" onClick={handleDuplicateSelected} className="hover:bg-muted">
+                <i className="fas fa-copy w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="hover:bg-muted text-red-500">
+                <i className="fas fa-trash w-4 h-4" />
+              </Button>
+            </>
+          )}
           <GlobalSettingsDialog />
         </div>
       </div>
@@ -217,16 +281,19 @@ export const Timeline = () => {
                   key={clip.id}
                   draggable
                   onDragStart={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    dragOffsetRef.current = e.clientX - rect.left;
                     e.dataTransfer.setData('clipId', clip.id);
                     draggedClipRef.current = clip.id;
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                   onDragEnd={() => {
                     draggedClipRef.current = null;
+                    dragOffsetRef.current = 0;
                   }}
-                  onClick={() => selectClip(clip.id)}
+                  onClick={(e) => selectClip(clip.id, e.shiftKey)}
                   className={`absolute h-10 top-2 rounded cursor-move transition-all ${
-                    selectedClipId === clip.id 
+                    selectedClipIds.includes(clip.id)
                       ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary' 
                       : 'bg-[hsl(var(--clip-video))] border-2 border-transparent hover:opacity-80'
                   }`}
@@ -261,16 +328,19 @@ export const Timeline = () => {
                   key={clip.id}
                   draggable
                   onDragStart={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    dragOffsetRef.current = e.clientX - rect.left;
                     e.dataTransfer.setData('clipId', clip.id);
                     draggedClipRef.current = clip.id;
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                   onDragEnd={() => {
                     draggedClipRef.current = null;
+                    dragOffsetRef.current = 0;
                   }}
-                  onClick={() => selectClip(clip.id)}
+                  onClick={(e) => selectClip(clip.id, e.shiftKey)}
                   className={`absolute h-10 top-2 rounded cursor-move transition-all ${
-                    selectedClipId === clip.id 
+                    selectedClipIds.includes(clip.id)
                       ? 'bg-[hsl(var(--clip-audio))]/90 border-2 border-primary' 
                       : 'bg-[hsl(var(--clip-audio))] border-2 border-transparent hover:opacity-80'
                   }`}
