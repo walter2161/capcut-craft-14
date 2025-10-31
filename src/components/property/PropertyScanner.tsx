@@ -296,33 +296,21 @@ A copy deve:
       // Adicionar imagens aos recursos
       if (images.length > 0) {
         toast({
-          title: 'Carregando imagens...',
+          title: 'Adicionando imagens...',
           description: `${images.length} imagens encontradas`,
         });
 
-        for (const imageUrl of images) {
-          try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-              img.src = imageUrl;
-            });
-
-            const mediaItem: MediaItem = {
-              id: `img-${Date.now()}-${Math.random()}`,
-              type: 'image',
-              name: `Imagem ${images.indexOf(imageUrl) + 1}`,
-              data: imageUrl,
-              thumbnail: imageUrl,
-            };
-            
-            addMediaItem(mediaItem);
-          } catch (error) {
-            console.error('Erro ao carregar imagem:', imageUrl, error);
-          }
-        }
+        images.forEach((imageUrl, index) => {
+          const mediaItem: MediaItem = {
+            id: `img-${Date.now()}-${Math.random()}-${index}`,
+            type: 'image',
+            name: `Imagem ${index + 1}`,
+            data: imageUrl,
+            thumbnail: imageUrl,
+          };
+          
+          addMediaItem(mediaItem);
+        });
       }
 
       toast({
