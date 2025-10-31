@@ -191,13 +191,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     currentTime: 0,
   }),
 
-  resetProject: () => set({
-    mediaItems: [],
-    clips: [],
-    selectedClipId: null,
-    selectedClipIds: [],
-    currentTime: 0,
-    totalDuration: 0,
-    projectName: 'Projeto Sem Título',
-  }),
+  resetProject: () => {
+    set({
+      mediaItems: [],
+      clips: [],
+      selectedClipId: null,
+      selectedClipIds: [],
+      currentTime: 0,
+      totalDuration: 0,
+      projectName: 'Projeto Sem Título',
+    });
+    
+    // Limpar também o localStorage
+    try {
+      localStorage.removeItem('video-editor-autosave');
+      localStorage.removeItem('video-editor-autosave-expiry');
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+  },
 }));

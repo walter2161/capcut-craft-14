@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Scissors, Plus } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Scissors, Plus, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/store/editorStore";
 import { GlobalSettingsDialog } from "./GlobalSettingsDialog";
@@ -256,10 +256,12 @@ export const Timeline = () => {
                 Cortar
               </Button>
               <Button variant="ghost" size="sm" onClick={handleDuplicateSelected} className="hover:bg-muted" title="Duplicar (Ctrl+D)">
-                <i className="fas fa-copy w-4 h-4" />
+                <Copy className="w-4 h-4 mr-1" />
+                Duplicar
               </Button>
               <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="hover:bg-muted text-destructive" title="Deletar (Del)">
-                <i className="fas fa-trash w-4 h-4" />
+                <Trash2 className="w-4 h-4 mr-1" />
+                Deletar
               </Button>
             </>
           )}
@@ -398,9 +400,11 @@ export const Timeline = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            e.preventDefault();
                             removeClip(clip.id);
+                            updateTotalDuration();
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 hover:text-red-500"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 hover:text-red-500 hover:scale-125 text-lg font-bold"
                           title="Deletar clip"
                         >
                           ×
