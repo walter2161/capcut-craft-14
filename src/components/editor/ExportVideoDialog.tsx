@@ -202,7 +202,7 @@ export const ExportVideoDialog = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
 
-      const fps = globalSettings.videoFPS;
+      const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
       const frameInterval = 1000 / fps;
       // Garante duração mínima para melhor compatibilidade de players (e evitar arquivo vazio)
       const durationMs = Math.max(totalDuration, 2000);
@@ -223,6 +223,11 @@ export const ExportVideoDialog = () => {
         : { videoBitsPerSecond: 5_000_000 };
       const mediaRecorder = new MediaRecorder(stream, options);
 
+      mediaRecorder.onerror = (e: any) => {
+        console.error('MediaRecorder error:', e);
+        toast.error("Falha ao gravar vídeo (MediaRecorder).");
+      };
+
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
@@ -230,37 +235,68 @@ export const ExportVideoDialog = () => {
 
       const stopped = new Promise<void>((resolve) => {
         mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}.webm`;
-          a.click();
-          URL.revokeObjectURL(url);
-          setIsExporting(false);
-          setExportProgress(100);
-          toast.success("Vídeo exportado com sucesso!");
-          setTimeout(() => setIsOpen(false), 1500);
-          resolve();
+          try {
+            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+            if (!blob || blob.size < 1024) {
+              console.error('Blob de vídeo vazio ou muito pequeno:', { size: blob?.size, chunks: chunks.length });
+              toast.error("Falha ao exportar: arquivo de vídeo ficou vazio.");
+              setIsExporting(false);
+              resolve();
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setIsExporting(false);
+            setExportProgress(100);
+            toast.success("Vídeo exportado com sucesso!");
+            setTimeout(() => setIsOpen(false), 1500);
+            resolve();
+          } catch (err) {
+            console.error('Erro ao finalizar exportação:', err);
+            toast.error("Erro ao finalizar exportação");
+            setIsExporting(false);
+            resolve();
+          }
         };
       });
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000);
 
-      // Renderizar frames (aguardando renderFrame, incluindo seek de vídeo)
-      for (let frame = 0; frame < totalFrames; frame++) {
-        const time = frame * frameInterval;
-        await renderFrame(ctx, time, canvas);
-        setExportProgress(Math.round((frame / totalFrames) * 100));
-        // Pequena pausa para respeitar FPS e permitir que o MediaRecorder capture o frame
-        await new Promise(resolve => setTimeout(resolve, frameInterval));
-      }
+      const videoTrack = stream.getVideoTracks()[0];
 
-      // Pequeno atraso para garantir que o último frame seja capturado
-      await new Promise(resolve => setTimeout(resolve, 120));
-      mediaRecorder.requestData?.();
-      mediaRecorder.stop();
+      await new Promise<void>((resolve) => {
+        let frame = 0;
+        const frameIntervalMs = frameInterval;
+        const timerId = setInterval(async () => {
+          try {
+            const time = frame * frameIntervalMs;
+            await renderFrame(ctx, time, canvas);
+            (videoTrack as any)?.requestFrame?.();
+            frame++;
+            setExportProgress(Math.min(100, Math.round((frame / totalFrames) * 100)));
+            if (frame >= totalFrames) {
+              clearInterval(timerId);
+              setTimeout(() => {
+                mediaRecorder.requestData?.();
+                mediaRecorder.stop();
+                resolve();
+              }, 120);
+            }
+          } catch (e) {
+            console.error('Erro ao renderizar frame:', e);
+            clearInterval(timerId);
+            try { mediaRecorder.stop(); } catch {}
+            resolve();
+          }
+        }, frameIntervalMs);
+      });
+
       await stopped;
+      try { stream.getTracks().forEach(t => t.stop()); } catch {}
     } catch (error) {
       console.error('Erro ao exportar vídeo:', error);
       toast.error("Erro ao exportar vídeo");
