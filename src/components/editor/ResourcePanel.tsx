@@ -4,16 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
 
-type TabType = 'media' | 'video' | 'audio' | 'sequence';
+type TabType = 'media' | 'video' | 'audio';
 
 export const ResourcePanel = () => {
   const [activeTab, setActiveTab] = useState<TabType>('media');
-  const { mediaItems, addMediaItem, removeMediaItem, addClip, sequences, addSequence, updateSequence, removeSequence } = useEditorStore();
+  const { mediaItems, addMediaItem, removeMediaItem, addClip } = useEditorStore();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const sequenceInputRef = useRef<HTMLInputElement>(null);
-  const [editingSequence, setEditingSequence] = useState<string | null>(null);
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'audio') => {
     const files = Array.from(e.target.files || []);
@@ -132,90 +130,6 @@ export const ResourcePanel = () => {
     e.dataTransfer.effectAllowed = 'copy';
   };
 
-  const handleSequenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const sequenceId = `sequence-${Date.now()}`;
-    const frames: any[] = [];
-
-    for (const file of files) {
-      const reader = new FileReader();
-      await new Promise((resolve) => {
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            frames.push({
-              id: `frame-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-              name: file.name,
-              data: img,
-              thumbnail: event.target?.result as string
-            });
-            resolve(null);
-          };
-          img.src = event.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    if (frames.length > 0) {
-      addSequence({
-        id: sequenceId,
-        name: `Sequência ${sequences.length + 1}`,
-        frames,
-        duration: 3000
-      });
-      toast.success(`Sequência criada com ${frames.length} frames`);
-    }
-  };
-
-  const handleReorderFrames = (sequenceId: string, fromIndex: number, toIndex: number) => {
-    const sequence = sequences.find(s => s.id === sequenceId);
-    if (!sequence) return;
-
-    const newFrames = [...sequence.frames];
-    const [removed] = newFrames.splice(fromIndex, 1);
-    newFrames.splice(toIndex, 0, removed);
-
-    updateSequence(sequenceId, { frames: newFrames });
-  };
-
-  const handleAddSequenceToTimeline = (sequence: any) => {
-    const track = 'V1';
-    const clipsInTrack = useEditorStore.getState().clips.filter(c => c.track === track);
-    const lastPosition = clipsInTrack.reduce((max, clip) => 
-      Math.max(max, clip.start + clip.duration), 0
-    );
-
-    // Adicionar cada frame como um clip separado
-    let currentPosition = lastPosition;
-    const frameDuration = sequence.duration / sequence.frames.length;
-
-    sequence.frames.forEach((frame: any) => {
-      addClip({
-        id: `clip-${Date.now()}-${Math.random()}`,
-        type: 'image',
-        mediaId: frame.id,
-        track,
-        start: currentPosition,
-        duration: frameDuration,
-        scale: 1,
-        brightness: 0,
-        contrast: 0,
-        volume: 1,
-        speed: 1,
-        opacity: 1,
-        transition: 'cross-fade',
-        transitionDuration: 500
-      });
-      currentPosition += frameDuration;
-    });
-
-    useEditorStore.getState().updateTotalDuration();
-    toast.success(`Sequência adicionada à timeline`);
-  };
-
   const images = mediaItems.filter(m => m.type === 'image');
   const videos = mediaItems.filter(m => m.type === 'video');
   const audios = mediaItems.filter(m => m.type === 'audio');
@@ -255,17 +169,6 @@ export const ResourcePanel = () => {
           title="Áudio"
         >
           <Music className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setActiveTab('sequence')}
-          className={`flex-1 px-2 py-3 flex items-center justify-center transition-colors ${
-            activeTab === 'sequence' 
-              ? 'bg-background text-foreground border-b-2 border-primary' 
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          title="Sequências"
-        >
-          <FolderOpen className="w-4 h-4" />
         </button>
       </div>
 
@@ -439,110 +342,6 @@ export const ResourcePanel = () => {
                   >
                     ×
                   </button>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {activeTab === 'sequence' && (
-          <>
-            <input
-              ref={sequenceInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              className="hidden"
-              onChange={handleSequenceUpload}
-            />
-            <Button
-              onClick={() => sequenceInputRef.current?.click()}
-              variant="secondary"
-              className="w-full mb-4"
-              size="sm"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
-
-            <div className="space-y-3">
-              {sequences.map((sequence) => (
-                <div
-                  key={sequence.id}
-                  className="bg-muted rounded p-2 group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold">{sequence.name}</span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setEditingSequence(editingSequence === sequence.id ? null : sequence.id)}
-                        className="text-xs px-2 py-1 bg-primary/20 rounded hover:bg-primary/30"
-                      >
-                        {editingSequence === sequence.id ? 'Fechar' : 'Editar'}
-                      </button>
-                      <button
-                        onClick={() => handleAddSequenceToTimeline(sequence)}
-                        className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                      >
-                        + Timeline
-                      </button>
-                      <button
-                        onClick={() => {
-                          removeSequence(sequence.id);
-                          toast.success('Sequência removida');
-                        }}
-                        className="text-xs w-5 h-5 bg-red-500 text-white rounded hover:bg-red-600"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {editingSequence === sequence.id ? (
-                    <div className="grid grid-cols-4 gap-1">
-                      {sequence.frames.map((frame, idx) => (
-                        <div
-                          key={frame.id}
-                          draggable
-                          onDragStart={(e) => e.dataTransfer.setData('frameIndex', idx.toString())}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const fromIndex = parseInt(e.dataTransfer.getData('frameIndex'));
-                            handleReorderFrames(sequence.id, fromIndex, idx);
-                          }}
-                          className="relative aspect-square bg-background rounded overflow-hidden cursor-move hover:ring-2 ring-primary"
-                        >
-                          <img 
-                            src={frame.thumbnail} 
-                            alt={frame.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] px-1 text-center">
-                            {idx + 1}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex gap-1 overflow-x-auto">
-                      {sequence.frames.slice(0, 5).map((frame, idx) => (
-                        <img 
-                          key={frame.id}
-                          src={frame.thumbnail} 
-                          alt={frame.name}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      ))}
-                      {sequence.frames.length > 5 && (
-                        <div className="w-12 h-12 bg-muted/50 rounded flex items-center justify-center text-[10px]">
-                          +{sequence.frames.length - 5}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    {sequence.frames.length} frames • {(sequence.duration / 1000).toFixed(1)}s
-                  </p>
                 </div>
               ))}
             </div>

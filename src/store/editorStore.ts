@@ -9,18 +9,6 @@ export interface MediaItem {
   thumbnail?: string;
 }
 
-export interface ImageSequence {
-  id: string;
-  name: string;
-  frames: Array<{
-    id: string;
-    name: string;
-    data: any;
-    thumbnail: string;
-  }>;
-  duration: number;
-}
-
 export interface Clip {
   id: string;
   type: 'image' | 'video' | 'audio';
@@ -48,7 +36,6 @@ export interface GlobalSettings {
 interface EditorState {
   mediaItems: MediaItem[];
   clips: Clip[];
-  sequences: ImageSequence[];
   selectedClipId: string | null;
   selectedClipIds: string[];
   isPlaying: boolean;
@@ -73,15 +60,11 @@ interface EditorState {
   setProjectName: (name: string) => void;
   loadProject: (data: any) => void;
   resetProject: () => void;
-  addSequence: (sequence: ImageSequence) => void;
-  updateSequence: (id: string, updates: Partial<ImageSequence>) => void;
-  removeSequence: (id: string) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   mediaItems: [],
   clips: [],
-  sequences: [],
   selectedClipId: null,
   selectedClipIds: [],
   isPlaying: false,
@@ -211,25 +194,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetProject: () => set({
     mediaItems: [],
     clips: [],
-    sequences: [],
     selectedClipId: null,
     selectedClipIds: [],
     currentTime: 0,
     totalDuration: 0,
     projectName: 'Projeto Sem Título',
   }),
-
-  addSequence: (sequence) => set((state) => ({
-    sequences: [...state.sequences, sequence]
-  })),
-
-  updateSequence: (id, updates) => set((state) => ({
-    sequences: state.sequences.map(seq =>
-      seq.id === id ? { ...seq, ...updates } : seq
-    )
-  })),
-
-  removeSequence: (id) => set((state) => ({
-    sequences: state.sequences.filter(seq => seq.id !== id)
-  })),
 }));
