@@ -25,6 +25,7 @@ export const CopyGenerator = () => {
 
 Tipo: ${propertyData.tipo}
 Transação: ${propertyData.transacao}
+Referência: ${propertyData.referencia || ''}
 Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
 Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
 Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
@@ -39,6 +40,7 @@ A copy deve:
 - Ser curta e impactante (máximo 150 palavras)
 - Usar emojis estrategicamente
 - Destacar os principais diferenciais
+- Incluir código de referência (REF: ${propertyData.referencia || ''})
 - Criar senso de urgência
 - Incluir call-to-action forte
 - Incluir hashtags relevantes (#imoveis #${propertyData.cidade.toLowerCase()})`;
@@ -90,7 +92,8 @@ A copy deve:
         ? `Destaques: ${propertyData.diferenciais.slice(0, 5).join(', ')}.\n`
         : '';
 
-      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲\n\n#imoveis #${cidade.toLowerCase()}`;
+      const ref = propertyData.referencia ? `\n\n📋 REF: ${propertyData.referencia}` : '';
+      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲${ref}\n\n#imoveis #${cidade.toLowerCase()}`;
       setGeneratedCopy(fallback);
       toast.success('Copy gerada (fallback)');
     } finally {

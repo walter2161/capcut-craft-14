@@ -4,6 +4,7 @@ export interface PropertyData {
   // Básico
   tipo: string; // Casa, Apartamento, Terreno, Comercial
   transacao: string; // Venda, Aluguel
+  referencia?: string; // Código de referência do imóvel
   
   // Localização
   bairro: string;
