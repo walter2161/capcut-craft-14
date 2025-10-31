@@ -8,6 +8,8 @@ import { usePropertyStore, PropertyData } from '@/store/propertyStore';
 import { useEditorStore, MediaItem } from '@/store/editorStore';
 import { useNavigate } from 'react-router-dom';
 
+const MISTRAL_API_KEY = 'aynCSftAcQBOlxmtmpJqVzco8K4aaTDQ';
+
 export const PropertyScanner = () => {
   const [url, setUrl] = useState('');
   const [isScanning, setIsScanning] = useState(false);
@@ -16,38 +18,69 @@ export const PropertyScanner = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const extractPropertyData = (html: string): Partial<PropertyData> => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    const data: Partial<PropertyData> = {
-      diferenciais: [],
-      descricaoAdicional: ''
-    };
+  const extractPropertyDataWithAI = async (html: string): Promise<Partial<PropertyData>> => {
+    try {
+      // Limitar o tamanho do HTML para não exceder limites da API
+      const cleanHtml = html.slice(0, 10000);
+      
+      const prompt = `Analise o HTML de um anúncio de imóvel e extraia as seguintes informações em formato JSON.
+Procure especialmente por elementos como: area útil, quartos, suítes, vagas, banheiros, sacadas, tipo de imóvel, preço, bairro, cidade, estado.
 
-    // Extrair texto do body para análise
-    const bodyText = doc.body.innerText || doc.body.textContent || '';
-    
-    // Tentar extrair valores numéricos básicos
-    const quartoMatch = bodyText.match(/(\d+)\s*(quarto|dormitório|dorm)/i);
-    if (quartoMatch) data.quartos = parseInt(quartoMatch[1]);
-    
-    const banheiroMatch = bodyText.match(/(\d+)\s*(banheiro|bath)/i);
-    if (banheiroMatch) data.banheiros = parseInt(banheiroMatch[1]);
-    
-    const vagaMatch = bodyText.match(/(\d+)\s*(vaga|garagem)/i);
-    if (vagaMatch) data.vagas = parseInt(vagaMatch[1]);
-    
-    const areaMatch = bodyText.match(/(\d+(?:,\d+)?)\s*m[²2]/i);
-    if (areaMatch) data.area = parseFloat(areaMatch[1].replace(',', '.'));
-    
-    // Extrair valor
-    const valorMatch = bodyText.match(/R\$\s*([\d.,]+)/);
-    if (valorMatch) {
-      data.valor = parseFloat(valorMatch[1].replace(/\./g, '').replace(',', '.'));
+HTML do anúncio:
+${cleanHtml}
+
+Responda APENAS com um JSON no seguinte formato (sem texto adicional):
+{
+  "tipo": "Casa|Apartamento|Terreno|Comercial|Cobertura|Chácara",
+  "transacao": "Venda|Aluguel|Temporada",
+  "bairro": "nome do bairro",
+  "cidade": "nome da cidade", 
+  "estado": "sigla (ex: SP)",
+  "quartos": numero,
+  "banheiros": numero,
+  "vagas": numero,
+  "area": numero em m²,
+  "valor": numero (apenas número sem R$ ou pontos),
+  "condominio": numero ou null,
+  "iptu": numero ou null,
+  "diferenciais": ["lista", "de", "características"],
+  "descricaoAdicional": "breve descrição do imóvel"
+}`;
+
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'mistral-small-latest',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 800,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Erro na API Mistral:', response.status);
+        return {};
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      
+      // Tentar extrair JSON do conteúdo
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const extractedData = JSON.parse(jsonMatch[0]);
+        return extractedData;
+      }
+      
+      return {};
+    } catch (error) {
+      console.error('Erro ao extrair dados com IA:', error);
+      return {};
     }
-
-    return data;
   };
 
   const extractImages = (html: string, baseUrl: string): string[] => {
@@ -76,23 +109,8 @@ export const PropertyScanner = () => {
     return images.slice(0, 10); // Limitar a 10 imagens
   };
 
-  const generateCopyWithAI = async (propertyData: Partial<PropertyData>, htmlContent: string) => {
-    const apiKey = localStorage.getItem('mistral_api_key');
-    if (!apiKey) {
-      toast({
-        title: 'API Key não configurada',
-        description: 'Configure sua chave da API Mistral primeiro',
-        variant: 'destructive',
-      });
-      return '';
-    }
-
+  const generateCopyWithAI = async (propertyData: Partial<PropertyData>) => {
     try {
-      // Extrair descrição do HTML
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlContent, 'text/html');
-      const description = doc.body.innerText.slice(0, 2000); // Limitar tamanho
-
       const prompt = `Com base nas informações do imóvel abaixo, crie uma copy persuasiva e atraente para um post de rede social (Instagram/TikTok):
 
 Tipo: ${propertyData.tipo || 'Imóvel'}
@@ -101,8 +119,7 @@ Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.est
 Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas${propertyData.area ? `, ${propertyData.area}m²` : ''}
 Valor: R$ ${propertyData.valor?.toLocaleString('pt-BR')}
 ${propertyData.diferenciais && propertyData.diferenciais.length > 0 ? `Diferenciais: ${propertyData.diferenciais.join(', ')}` : ''}
-
-Descrição do imóvel: ${description}
+${propertyData.descricaoAdicional ? `Descrição: ${propertyData.descricaoAdicional}` : ''}
 
 A copy deve:
 - Ser curta e impactante (máximo 150 palavras)
@@ -116,7 +133,7 @@ A copy deve:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
         },
         body: JSON.stringify({
           model: 'mistral-small-latest',
@@ -148,78 +165,31 @@ A copy deve:
 
     setIsScanning(true);
     try {
-      // Fetch da página
       toast({
         title: 'Escaneando...',
         description: 'Buscando informações do imóvel',
       });
 
-      const response = await fetch(url);
+      // Fetch da página usando CORS proxy
+      const proxyUrl = 'https://api.allorigins.win/raw?url=';
+      const response = await fetch(proxyUrl + encodeURIComponent(url));
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar página');
+      }
+      
       const html = await response.text();
 
-      // Extrair dados básicos do HTML
-      const extractedData = extractPropertyData(html);
+      toast({
+        title: 'Analisando com IA...',
+        description: 'Extraindo informações do imóvel com Mistral AI',
+      });
+
+      // Usar IA Mistral para extrair informações do HTML
+      const extractedData = await extractPropertyDataWithAI(html);
       
       // Extrair imagens
       const images = extractImages(html, url);
-      
-      toast({
-        title: 'Analisando com IA...',
-        description: 'Processando informações do imóvel',
-      });
-
-      // Usar IA para extrair informações mais detalhadas
-      const apiKey = localStorage.getItem('mistral_api_key');
-      if (apiKey) {
-        try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const bodyText = (doc.body.innerText || '').slice(0, 3000);
-
-          const extractResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: 'mistral-small-latest',
-              messages: [{
-                role: 'user',
-                content: `Analise este anúncio de imóvel e extraia APENAS as seguintes informações em formato JSON:
-{
-  "tipo": "Casa/Apartamento/Terreno/Comercial/Cobertura/Chácara",
-  "transacao": "Venda/Aluguel/Temporada",
-  "bairro": "nome do bairro",
-  "cidade": "nome da cidade",
-  "estado": "sigla do estado (ex: SP)",
-  "diferenciais": ["lista", "de", "diferenciais"],
-  "descricaoAdicional": "breve descrição do imóvel"
-}
-
-Texto do anúncio:
-${bodyText}
-
-Responda APENAS com o JSON, sem texto adicional.`
-              }],
-              temperature: 0.3,
-              max_tokens: 300,
-            }),
-          });
-
-          if (extractResponse.ok) {
-            const data = await extractResponse.json();
-            const content = data.choices[0].message.content;
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const aiData = JSON.parse(jsonMatch[0]);
-              Object.assign(extractedData, aiData);
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao usar IA para extração:', error);
-        }
-      }
 
       // Mesclar com valores padrão
       const finalData: PropertyData = {
@@ -246,7 +216,12 @@ Responda APENAS com o JSON, sem texto adicional.`
       setPropertyData(finalData);
 
       // Gerar copy com IA
-      const copy = await generateCopyWithAI(finalData, html);
+      toast({
+        title: 'Gerando copy...',
+        description: 'Criando texto para redes sociais',
+      });
+      
+      const copy = await generateCopyWithAI(finalData);
       if (copy) {
         setGeneratedCopy(copy);
       }

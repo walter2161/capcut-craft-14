@@ -6,24 +6,19 @@ import { Sparkles, Copy, RefreshCw } from 'lucide-react';
 import { usePropertyStore } from '@/store/propertyStore';
 import { toast } from 'sonner';
 
+const MISTRAL_API_KEY = 'aynCSftAcQBOlxmtmpJqVzco8K4aaTDQ';
+
 export const CopyGenerator = () => {
   const { propertyData, generatedCopy, setGeneratedCopy } = usePropertyStore();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('mistral-api-key') || '');
 
   const generateCopy = async () => {
-    if (!apiKey) {
-      toast.error('Configure sua chave API da Mistral primeiro');
-      return;
-    }
-
     if (!propertyData) {
       toast.error('Preencha os dados do imóvel primeiro');
       return;
     }
 
     setIsGenerating(true);
-    localStorage.setItem('mistral-api-key', apiKey);
 
     try {
       const prompt = `Crie uma copy persuasiva e atraente para um post de rede social (Instagram/TikTok) sobre este imóvel:
@@ -52,7 +47,7 @@ A copy deve:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
         },
         body: JSON.stringify({
           model: 'mistral-small-latest',
@@ -98,23 +93,9 @@ A copy deve:
       </div>
 
       <div className="space-y-3">
-        <div>
-          <Label>Chave API Mistral</Label>
-          <Input 
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Sua chave API da Mistral"
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Obtenha em: <a href="https://console.mistral.ai" target="_blank" rel="noopener" className="text-primary hover:underline">console.mistral.ai</a>
-          </p>
-        </div>
-
         <Button 
           onClick={generateCopy} 
-          disabled={isGenerating || !apiKey}
+          disabled={isGenerating}
           className="w-full"
         >
           {isGenerating ? (

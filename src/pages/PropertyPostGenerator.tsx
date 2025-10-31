@@ -63,7 +63,7 @@ const PropertyPostGenerator = () => {
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">3.</span>
-              Configure sua chave API da Mistral e gere a copy automaticamente
+              Clique em "Gerar Copy" para criar o texto automaticamente com IA
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">4.</span>
