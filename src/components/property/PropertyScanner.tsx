@@ -317,61 +317,99 @@ A copy deve:
       // Adicionar imagens aos recursos e à timeline
       if (images.length > 0) {
         toast({
-          title: 'Adicionando imagens...',
+          title: 'Carregando imagens...',
           description: `${images.length} imagens encontradas`,
         });
 
         const createdMedia: MediaItem[] = [];
 
-        images.forEach((imageUrl, index) => {
-          const mediaItem: MediaItem = {
-            id: `img-${Date.now()}-${Math.random()}-${index}`,
-            type: 'image',
-            name: `Imagem ${index + 1}`,
-            data: imageUrl,
-            thumbnail: imageUrl,
-          };
-          createdMedia.push(mediaItem);
-          addMediaItem(mediaItem);
-        });
-
-        // Inserir automaticamente na timeline (track V1)
-        const editorState = useEditorStore.getState();
-        const defaultDur = editorState.globalSettings?.defaultImageDuration ?? 3000;
-        // Começar após o final atual da timeline
-        const baseStart =
-          editorState.clips.length > 0
-            ? Math.max(...editorState.clips.map(c => c.start + c.duration))
-            : 0;
-
-        let start = baseStart;
-        createdMedia.forEach((mi) => {
-          const clipId = `clip-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          addClip({
-            id: clipId,
-            type: 'image',
-            mediaId: mi.id,
-            track: 'V1',
-            start,
-            duration: defaultDur,
-            scale: 1.0,
-            brightness: 0,
-            contrast: 0,
-            volume: 1.0,
-            speed: 1.0,
-            opacity: 1.0,
-            transition: 'none',
-            transitionDuration: 0,
+        // Carregar todas as imagens como HTMLImageElement
+        const loadPromises = images.map((imageUrl, index) => {
+          return new Promise<MediaItem>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+              const mediaItem: MediaItem = {
+                id: `img-${Date.now()}-${Math.random()}-${index}`,
+                type: 'image',
+                name: `Imagem ${index + 1}`,
+                data: img, // HTMLImageElement carregado!
+                thumbnail: imageUrl,
+              };
+              resolve(mediaItem);
+            };
+            
+            img.onerror = () => {
+              // Fallback: usar URL diretamente se CORS falhar
+              console.warn('Erro ao carregar imagem com CORS, usando URL direta:', imageUrl);
+              const mediaItem: MediaItem = {
+                id: `img-${Date.now()}-${Math.random()}-${index}`,
+                type: 'image',
+                name: `Imagem ${index + 1}`,
+                data: imageUrl,
+                thumbnail: imageUrl,
+              };
+              resolve(mediaItem);
+            };
+            
+            img.src = imageUrl;
           });
-          start += defaultDur;
         });
 
-        updateTotalDuration();
+        try {
+          const loadedMedia = await Promise.all(loadPromises);
+          
+          loadedMedia.forEach(mediaItem => {
+            createdMedia.push(mediaItem);
+            addMediaItem(mediaItem);
+          });
 
-        toast({
-          title: 'Timeline atualizada',
-          description: `${createdMedia.length} imagens adicionadas à timeline`,
-        });
+          // Inserir automaticamente na timeline (track V1)
+          const editorState = useEditorStore.getState();
+          const defaultDur = editorState.globalSettings?.defaultImageDuration ?? 3000;
+          // Começar após o final atual da timeline
+          const baseStart =
+            editorState.clips.length > 0
+              ? Math.max(...editorState.clips.map(c => c.start + c.duration))
+              : 0;
+
+          let start = baseStart;
+          createdMedia.forEach((mi) => {
+            const clipId = `clip-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            addClip({
+              id: clipId,
+              type: 'image',
+              mediaId: mi.id,
+              track: 'V1',
+              start,
+              duration: defaultDur,
+              scale: 1.0,
+              brightness: 0,
+              contrast: 0,
+              volume: 1.0,
+              speed: 1.0,
+              opacity: 1.0,
+              transition: 'cross-fade',
+              transitionDuration: 500,
+            });
+            start += defaultDur;
+          });
+
+          updateTotalDuration();
+
+          toast({
+            title: 'Sucesso!',
+            description: `${createdMedia.length} imagens adicionadas à timeline`,
+          });
+        } catch (error) {
+          console.error('Erro ao carregar imagens:', error);
+          toast({
+            title: 'Erro',
+            description: 'Algumas imagens não puderam ser carregadas',
+            variant: 'destructive',
+          });
+        }
       }
 
       toast({
