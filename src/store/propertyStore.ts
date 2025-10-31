@@ -6,7 +6,6 @@ export interface PropertyData {
   transacao: string; // Venda, Aluguel
   
   // Localização
-  endereco: string;
   bairro: string;
   cidade: string;
   estado: string;
@@ -45,7 +44,6 @@ interface PropertyState {
 const defaultProperty: PropertyData = {
   tipo: 'Apartamento',
   transacao: 'Venda',
-  endereco: '',
   bairro: '',
   cidade: '',
   estado: '',

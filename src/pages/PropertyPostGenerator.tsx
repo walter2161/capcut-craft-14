@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PropertyForm } from '@/components/property/PropertyForm';
+import { PropertyScanner } from '@/components/property/PropertyScanner';
 import { CopyGenerator } from '@/components/property/CopyGenerator';
 import { Video, ArrowRight, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +41,10 @@ const PropertyPostGenerator = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <PropertyScanner />
+        </div>
+        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PropertyForm />
           <CopyGenerator />
@@ -50,23 +55,23 @@ const PropertyPostGenerator = () => {
           <ol className="space-y-2 text-muted-foreground">
             <li className="flex gap-2">
               <span className="font-bold text-primary">1.</span>
-              Preencha os dados do imóvel no formulário
+              Cole a URL do imóvel e clique em "Escanear" para preencher tudo automaticamente
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">2.</span>
-              Configure sua chave API da Mistral e gere a copy automaticamente
+              Ou preencha manualmente os dados do imóvel no formulário
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">3.</span>
-              Vá para o editor e adicione suas fotos/vídeos do imóvel
+              Configure sua chave API da Mistral e gere a copy automaticamente
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">4.</span>
-              Organize na timeline (formato 9:16 já configurado)
+              O scan automático já adiciona as imagens ao editor (formato 9:16)
             </li>
             <li className="flex gap-2">
               <span className="font-bold text-primary">5.</span>
-              Exporte seu vídeo pronto para Instagram, TikTok e outras redes!
+              Organize na timeline e exporte seu vídeo pronto!
             </li>
           </ol>
         </div>

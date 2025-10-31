@@ -67,15 +67,6 @@ export const PropertyForm = () => {
         </div>
 
         <div className="space-y-3 mb-4">
-          <div>
-            <Label>Endereço</Label>
-            <Input 
-              value={propertyData?.endereco} 
-              onChange={(e) => updateField('endereco', e.target.value)}
-              placeholder="Rua, número"
-            />
-          </div>
-          
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label>Bairro</Label>

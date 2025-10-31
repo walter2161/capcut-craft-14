@@ -30,7 +30,7 @@ export const CopyGenerator = () => {
 
 Tipo: ${propertyData.tipo}
 Transação: ${propertyData.transacao}
-Localização: ${propertyData.endereco}, ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
+Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
 Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
 Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
 ${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
