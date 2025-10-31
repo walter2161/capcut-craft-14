@@ -33,23 +33,18 @@ export const ExportVideoDialog = () => {
     }
   };
 
-  const renderFrame = (ctx: CanvasRenderingContext2D, time: number, canvas: HTMLCanvasElement) => {
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Cache de mídias preparadas para exportação
+  const drawableCache = new Map<string, HTMLImageElement | HTMLVideoElement>();
 
-    const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
-    const currentClip = videoClips.find(c => c.start <= time && c.start + c.duration > time);
-
-    if (!currentClip) return;
-
-    const mediaItem = mediaItems.find(m => m.id === currentClip.mediaId);
-    if (!mediaItem || !mediaItem.data) return;
-
-    const image = mediaItem.data;
-    const imgRatio = image.width / image.height;
+  const fitImageToCanvas = (media: any, canvas: HTMLCanvasElement) => {
+    const srcWidth = media?.videoWidth || media?.naturalWidth || media?.width || 0;
+    const srcHeight = media?.videoHeight || media?.naturalHeight || media?.height || 0;
+    if (!srcWidth || !srcHeight) {
+      return { drawWidth: canvas.width, drawHeight: canvas.height, offsetX: 0, offsetY: 0 };
+    }
     const canvasRatio = canvas.width / canvas.height;
-
-    let drawWidth, drawHeight, offsetX, offsetY;
+    const imgRatio = srcWidth / srcHeight;
+    let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
     if (imgRatio > canvasRatio) {
       drawWidth = canvas.width;
       drawHeight = drawWidth / imgRatio;
@@ -61,16 +56,136 @@ export const ExportVideoDialog = () => {
       offsetX = (canvas.width - drawWidth) / 2;
       offsetY = 0;
     }
+    return { drawWidth, drawHeight, offsetX, offsetY };
+  };
 
+  const loadDrawable = async (mediaId: string) => {
+    if (drawableCache.has(mediaId)) return drawableCache.get(mediaId)!;
+    const item = mediaItems.find(m => m.id === mediaId);
+    if (!item) return null;
+
+    if (item.type === 'image') {
+      if (item.data instanceof HTMLImageElement) {
+        drawableCache.set(mediaId, item.data);
+        return item.data;
+      }
+      if (typeof item.data === 'string') {
+        const img = new Image();
+        // Tentar evitar canvas "tainted" quando possível
+        img.crossOrigin = 'anonymous';
+        const src = item.data;
+        const load = () => new Promise<HTMLImageElement>((resolve, reject) => {
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('Falha ao carregar imagem para exportação'));
+          img.src = src;
+        });
+        try {
+          const loaded = await load();
+          drawableCache.set(mediaId, loaded);
+          return loaded;
+        } catch {
+          // Tentativa sem crossOrigin como fallback
+          const fallback = new Image();
+          const load2 = () => new Promise<HTMLImageElement>((resolve, reject) => {
+            fallback.onload = () => resolve(fallback);
+            fallback.onerror = () => reject(new Error('Falha ao carregar imagem'));
+            fallback.src = src;
+          });
+          try {
+            const loaded2 = await load2();
+            drawableCache.set(mediaId, loaded2);
+            return loaded2;
+          } catch {
+            return null;
+          }
+        }
+      }
+      return null;
+    }
+
+    if (item.type === 'video') {
+      if (item.data instanceof HTMLVideoElement) {
+        // Garantir metadados carregados
+        const video = item.data as HTMLVideoElement;
+        if (video.readyState < 1) {
+          await new Promise<void>((resolve) => {
+            video.addEventListener('loadedmetadata', () => resolve(), { once: true });
+          });
+        }
+        drawableCache.set(mediaId, video);
+        return video;
+      }
+    }
+
+    return null;
+  };
+
+  const seekVideo = (video: HTMLVideoElement, time: number) => {
+    return new Promise<void>((resolve) => {
+      const onSeeked = () => {
+        video.removeEventListener('seeked', onSeeked);
+        resolve();
+      };
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = time;
+    });
+  };
+
+  const renderFrame = async (ctx: CanvasRenderingContext2D, time: number, canvas: HTMLCanvasElement) => {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
+    const currentClip = videoClips.find(c => c.start <= time && c.start + c.duration > time);
+    if (!currentClip) return;
+
+    const media = await loadDrawable(currentClip.mediaId);
+    if (!media) return;
+
+    const timeInClip = time - currentClip.start;
+    const transitionDuration = currentClip.transitionDuration || 500;
+
+    // Desenhar próximo clipe ao fundo para cross-fade
+    const currentIndex = videoClips.indexOf(currentClip);
+    const nextClip = currentIndex < videoClips.length - 1 ? videoClips[currentIndex + 1] : null;
+    let alpha = currentClip.opacity;
+    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
+      const transitionStart = currentClip.duration - transitionDuration;
+      if (timeInClip >= transitionStart) {
+        const transitionTime = timeInClip - transitionStart;
+        const transitionProgress = Math.min(1, Math.max(0, transitionTime / transitionDuration));
+        const nextMedia = await loadDrawable(nextClip.mediaId);
+        if (nextMedia) {
+          const nextProps = fitImageToCanvas(nextMedia, canvas);
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+          const nextScaledW = nextProps.drawWidth * nextClip.scale;
+          const nextScaledH = nextProps.drawHeight * nextClip.scale;
+          const nextX = (canvas.width - nextScaledW) / 2;
+          const nextY = (canvas.height - nextScaledH) / 2;
+          ctx.drawImage(nextMedia as any, nextX, nextY, nextScaledW, nextScaledH);
+        }
+        alpha = (1 - transitionProgress) * currentClip.opacity;
+      }
+    }
+
+    // Vídeo: sincronizar tempo antes de desenhar
+    if (media instanceof HTMLVideoElement) {
+      const videoTime = (timeInClip / 1000) * currentClip.speed;
+      if (Math.abs(media.currentTime - videoTime) > 0.05) {
+        await seekVideo(media, Math.max(0, Math.min(videoTime, media.duration || 0)));
+      }
+      if (media.readyState < 2) return;
+    }
+
+    const props = fitImageToCanvas(media, canvas);
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
-    ctx.globalAlpha = currentClip.opacity;
-
-    const scaledWidth = drawWidth * currentClip.scale;
-    const scaledHeight = drawHeight * currentClip.scale;
-    const finalOffsetX = (canvas.width - scaledWidth) / 2;
-    const finalOffsetY = (canvas.height - scaledHeight) / 2;
-
-    ctx.drawImage(image, finalOffsetX, finalOffsetY, scaledWidth, scaledHeight);
+    ctx.globalAlpha = alpha;
+    const scaledW = props.drawWidth * currentClip.scale;
+    const scaledH = props.drawHeight * currentClip.scale;
+    const x = (canvas.width - scaledW) / 2;
+    const y = (canvas.height - scaledH) / 2;
+    ctx.drawImage(media as any, x, y, scaledW, scaledH);
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
   };
@@ -91,6 +206,11 @@ export const ExportVideoDialog = () => {
       const frameInterval = 1000 / fps;
       const totalFrames = Math.ceil(totalDuration / frameInterval);
 
+      // Precarregar todas as mídias necessárias para exportação
+      const videoClips = clips.filter(c => c.track.startsWith('V'));
+      const uniqueMediaIds = Array.from(new Set(videoClips.map(c => c.mediaId)));
+      await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
+
       const stream = canvas.captureStream(fps);
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp9',
@@ -102,32 +222,36 @@ export const ExportVideoDialog = () => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        setIsExporting(false);
-        setExportProgress(100);
-        toast.success("Vídeo exportado com sucesso!");
-        setTimeout(() => setIsOpen(false), 1500);
-      };
+      const stopped = new Promise<void>((resolve) => {
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setIsExporting(false);
+          setExportProgress(100);
+          toast.success("Vídeo exportado com sucesso!");
+          setTimeout(() => setIsOpen(false), 1500);
+          resolve();
+        };
+      });
 
       mediaRecorder.start();
 
-      // Render frames
+      // Renderizar frames (aguardando renderFrame, incluindo seek de vídeo)
       for (let frame = 0; frame < totalFrames; frame++) {
         const time = frame * frameInterval;
-        renderFrame(ctx, time, canvas);
+        await renderFrame(ctx, time, canvas);
         setExportProgress(Math.round((frame / totalFrames) * 100));
+        // Pequena pausa para respeitar FPS e permitir que o MediaRecorder capture o frame
         await new Promise(resolve => setTimeout(resolve, frameInterval));
       }
 
       mediaRecorder.stop();
+      await stopped;
     } catch (error) {
       console.error('Erro ao exportar vídeo:', error);
       toast.error("Erro ao exportar vídeo");
