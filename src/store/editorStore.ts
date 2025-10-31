@@ -110,7 +110,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     const newClip = {
       ...clipToDuplicate,
-      id: `clip-${Date.now()}-${Math.random()}`,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
       start: clipToDuplicate.start + clipToDuplicate.duration
     };
     
@@ -125,13 +125,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     const firstPart = {
       ...clipToSplit,
-      id: `clip-${Date.now()}-${Math.random()}-1`,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}-1`,
       duration: splitTime - clipToSplit.start
     };
     
     const secondPart = {
       ...clipToSplit,
-      id: `clip-${Date.now()}-${Math.random()}-2`,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}-2`,
       start: splitTime,
       duration: (clipToSplit.start + clipToSplit.duration) - splitTime
     };

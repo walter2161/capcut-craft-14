@@ -1,4 +1,4 @@
-import { Video, Save, FolderOpen } from "lucide-react";
+import { Video, Save, FolderOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/store/editorStore";
@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useRef } from "react";
 
 export const EditorHeader = () => {
-  const { clips, mediaItems, globalSettings, projectName, setProjectName, loadProject } = useEditorStore();
+  const { clips, mediaItems, globalSettings, projectName, setProjectName, loadProject, resetProject } = useEditorStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveProject = () => {
@@ -82,6 +82,21 @@ export const EditorHeader = () => {
       </div>
       
       <div className="flex items-center gap-2 shrink-0">
+        <Button 
+          onClick={() => {
+            if (confirm('Deseja criar um novo projeto? Isso irá limpar tudo. Salve antes de continuar!')) {
+              resetProject();
+              toast.success('Novo projeto criado');
+            }
+          }}
+          variant="outline"
+          size="sm"
+          title="Criar novo projeto"
+        >
+          <Plus className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Novo</span>
+        </Button>
+        
         <Button 
           onClick={handleSaveProject}
           variant="outline"

@@ -104,7 +104,7 @@ export const ResourcePanel = () => {
     );
     
     addClip({
-      id: `clip-${Date.now()}`,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
       type: item.type,
       mediaId: item.id,
       track,

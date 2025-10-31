@@ -123,7 +123,7 @@ export const VideoPreview = () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const videoClips = clips.filter(c => c.track === 'V1').sort((a, b) => a.start - b.start);
+    const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
     
     const currentClip = videoClips.find(
       c => c.start <= time && c.start + c.duration > time
@@ -132,11 +132,23 @@ export const VideoPreview = () => {
     if (!currentClip) return;
 
     const mediaItem = mediaItems.find(m => m.id === currentClip.mediaId);
-    if (!mediaItem || !mediaItem.data) return;
+    if (!mediaItem || !mediaItem.data) {
+      console.warn('Media item not found or has no data:', currentClip.mediaId);
+      return;
+    }
 
-    const image = mediaItem.data;
+    // Suporte para vídeo e imagem
+    const media = mediaItem.data;
     const timeInClip = time - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
+    
+    // Se for vídeo, atualizar o currentTime
+    if (mediaItem.type === 'video' && media instanceof HTMLVideoElement) {
+      const videoTime = (timeInClip / 1000) * currentClip.speed;
+      if (Math.abs(media.currentTime - videoTime) > 0.1) {
+        media.currentTime = videoTime;
+      }
+    }
     
     // Verificar se há um clipe seguinte para transição
     const currentIndex = videoClips.indexOf(currentClip);
@@ -152,11 +164,11 @@ export const VideoPreview = () => {
         const transitionTime = timeInClip - transitionStart;
         const transitionProgress = transitionTime / transitionDuration;
         
-        // Desenhar a próxima imagem (fundo)
+        // Desenhar a próxima imagem/vídeo (fundo)
         const nextMediaItem = mediaItems.find(m => m.id === nextClip.mediaId);
         if (nextMediaItem && nextMediaItem.data) {
-          const nextImage = nextMediaItem.data;
-          const nextImgProps = fitImageToCanvas(nextImage, canvas);
+          const nextMedia = nextMediaItem.data;
+          const nextImgProps = fitImageToCanvas(nextMedia, canvas);
           
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
@@ -166,16 +178,16 @@ export const VideoPreview = () => {
           const nextOffsetX = (canvas.width - nextScaledWidth) / 2;
           const nextOffsetY = (canvas.height - nextScaledHeight) / 2;
           
-          ctx.drawImage(nextImage, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
+          ctx.drawImage(nextMedia, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
         }
         
-        // Ajustar alpha da imagem atual para fade out
+        // Ajustar alpha da mídia atual para fade out
         alpha = (1 - transitionProgress) * currentClip.opacity;
       }
     }
     
-    // Desenhar a imagem atual
-    const imgProps = fitImageToCanvas(image, canvas);
+    // Desenhar a mídia atual (imagem ou vídeo)
+    const imgProps = fitImageToCanvas(media, canvas);
     
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
     ctx.globalAlpha = alpha;
@@ -185,7 +197,7 @@ export const VideoPreview = () => {
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2;
 
-    ctx.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
+    ctx.drawImage(media, offsetX, offsetY, scaledWidth, scaledHeight);
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
   };

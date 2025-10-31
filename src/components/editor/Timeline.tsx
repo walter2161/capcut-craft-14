@@ -136,7 +136,7 @@ export const Timeline = () => {
     }
 
     const newClip = {
-      id: `clip-${Date.now()}-${Math.random()}`,
+      id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
       type: mediaItem.type,
       mediaId: mediaItem.id,
       track: track,
