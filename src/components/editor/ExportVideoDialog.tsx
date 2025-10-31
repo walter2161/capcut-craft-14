@@ -14,7 +14,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
 
 export const ExportVideoDialog = () => {
-  const { clips, mediaItems, globalSettings, totalDuration, projectName } = useEditorStore();
+  const { clips, mediaItems, globalSettings, totalDuration, projectName, setCurrentTime, setIsPlaying, isPlaying, currentTime } = useEditorStore();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -195,15 +195,18 @@ export const ExportVideoDialog = () => {
     setExportProgress(0);
 
     try {
+      // Usar o canvas do Preview como fonte do vídeo
+      const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
+      if (!previewCanvas) {
+        throw new Error('Canvas de preview não encontrado. Abra o editor e tente novamente.');
+      }
+
+      // Garantir dimensões corretas (o Preview já usa as mesmas dimensões)
       const dimensions = getVideoDimensions();
-      const canvas = document.createElement('canvas');
-      canvas.width = dimensions.width;
-      canvas.height = dimensions.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
-      // Desenha um frame inicial para garantir que o stream tenha conteúdo
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (previewCanvas.width !== dimensions.width || previewCanvas.height !== dimensions.height) {
+        previewCanvas.width = dimensions.width;
+        previewCanvas.height = dimensions.height;
+      }
 
       const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
       const frameInterval = 1000 / fps;
@@ -216,7 +219,7 @@ export const ExportVideoDialog = () => {
       const uniqueMediaIds = Array.from(new Set(videoClips.map(c => c.mediaId)));
       await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
 
-      const stream = canvas.captureStream(fps);
+      const stream = previewCanvas.captureStream(fps);
       // Seleciona o MIME mais compatível disponível (prioriza VP8)
       const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
       const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
@@ -277,14 +280,24 @@ export const ExportVideoDialog = () => {
         try { await (videoTrack as any).applyConstraints?.({ frameRate: fps }); } catch {}
       }
 
-      // Renderização sequencial (garante que cada frame seja desenhado antes do próximo)
+      // Usar o preview já renderizado: avançar o tempo no store e esperar o desenho
+      const prevTime = currentTime;
+      const prevPlaying = isPlaying;
+      setIsPlaying(false);
+
+      const nextPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
       for (let frame = 0; frame < totalFrames; frame++) {
         const time = frame * frameInterval;
-        await renderFrame(ctx, time, canvas);
+        setCurrentTime(time);
+        await nextPaint();
         (videoTrack as any)?.requestFrame?.();
         setExportProgress(Math.round((frame / totalFrames) * 100));
-        await new Promise((resolve) => setTimeout(resolve, frameInterval));
       }
+
+      // Restaurar estado do player
+      setCurrentTime(prevTime);
+      setIsPlaying(prevPlaying);
 
       // Pequeno atraso para garantir que o último frame seja capturado
       await new Promise((resolve) => setTimeout(resolve, 150));
