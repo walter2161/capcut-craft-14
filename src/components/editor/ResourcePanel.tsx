@@ -43,7 +43,7 @@ export const ResourcePanel = () => {
         reader.onload = (event) => {
           const video = document.createElement('video');
           video.onloadedmetadata = () => {
-            video.currentTime = 0.1;
+            // Generate thumbnail only once to avoid duplicates when video currentTime changes later
             video.onseeked = () => {
               const canvas = document.createElement('canvas');
               canvas.width = video.videoWidth;
@@ -61,7 +61,14 @@ export const ResourcePanel = () => {
                 thumbnail
               });
               toast.success(`Vídeo "${file.name}" adicionado`);
+
+              // Important: prevent adding the same media again on future seek events
+              video.onseeked = null;
             };
+
+            try {
+              video.currentTime = 0.1;
+            } catch {}
           };
           video.onerror = () => {
             toast.error(`Erro ao carregar vídeo "${file.name}"`);

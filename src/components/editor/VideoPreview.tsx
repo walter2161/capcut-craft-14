@@ -97,11 +97,19 @@ export const VideoPreview = () => {
     }
   };
 
-  const fitImageToCanvas = (img: any, canvas: HTMLCanvasElement) => {
+  const fitImageToCanvas = (media: any, canvas: HTMLCanvasElement) => {
+    // Support Image, HTMLVideoElement, and CanvasImageSource
+    const srcWidth = media?.videoWidth || media?.naturalWidth || media?.width || 0;
+    const srcHeight = media?.videoHeight || media?.naturalHeight || media?.height || 0;
+
+    if (!srcWidth || !srcHeight) {
+      return { drawWidth: canvas.width, drawHeight: canvas.height, offsetX: 0, offsetY: 0 };
+    }
+
     const canvasRatio = canvas.width / canvas.height;
-    const imgRatio = img.width / img.height;
+    const imgRatio = srcWidth / srcHeight;
     
-    let drawWidth, drawHeight, offsetX, offsetY;
+    let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
     
     if (imgRatio > canvasRatio) {
       drawWidth = canvas.width;
@@ -145,8 +153,22 @@ export const VideoPreview = () => {
     // Se for vídeo, atualizar o currentTime
     if (mediaItem.type === 'video' && media instanceof HTMLVideoElement) {
       const videoTime = (timeInClip / 1000) * currentClip.speed;
+      
+      // Check if video has valid dimensions and is ready to play
+      if (media.videoWidth === 0 || media.videoHeight === 0) {
+        console.warn('Video has invalid dimensions:', media.videoWidth, media.videoHeight);
+        return;
+      }
+      
+      // Update video time
       if (Math.abs(media.currentTime - videoTime) > 0.1) {
-        media.currentTime = videoTime;
+        media.currentTime = Math.max(0, Math.min(videoTime, media.duration || 0));
+      }
+      
+      // Make sure video is ready for drawing
+      if (media.readyState < 2) {
+        console.log('Video not ready for drawing, readyState:', media.readyState);
+        return;
       }
     }
     
