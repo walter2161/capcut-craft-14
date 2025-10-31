@@ -1,14 +1,16 @@
-import { Video, Save, FolderOpen, Plus } from "lucide-react";
+import { Video, Save, FolderOpen, Plus, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/store/editorStore";
 import { ExportVideoDialog } from "./ExportVideoDialog";
 import { toast } from "sonner";
 import { useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 export const EditorHeader = () => {
   const { clips, mediaItems, globalSettings, projectName, setProjectName, loadProject, resetProject } = useEditorStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleSaveProject = () => {
     // Preparar dados sem binários para exportação
@@ -83,6 +85,16 @@ export const EditorHeader = () => {
       
       <div className="flex items-center gap-2 shrink-0">
         <Button 
+          onClick={() => navigate('/')}
+          variant="ghost"
+          size="sm"
+          title="Voltar ao formulário"
+        >
+          <Home className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Início</span>
+        </Button>
+        
+        <Button
           onClick={() => {
             if (confirm('Deseja criar um novo projeto? Isso irá limpar tudo. Salve antes de continuar!')) {
               resetProject();

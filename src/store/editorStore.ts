@@ -74,9 +74,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     defaultImageDuration: 3000,
     defaultTransitionDuration: 500,
     videoFPS: 30,
-    videoFormat: '16:9',
+    videoFormat: '9:16',
   },
-  projectName: 'Projeto Sem Título',
+  projectName: 'Post Imóvel 9:16',
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
@@ -213,7 +213,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       isPlaying: false,
       currentTime: 0,
       totalDuration: 0,
-      projectName: 'Projeto Sem Título',
+      projectName: 'Post Imóvel 9:16',
     });
   },
 }));
