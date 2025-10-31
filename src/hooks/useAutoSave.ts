@@ -10,6 +10,13 @@ export const useAutoSave = () => {
 
   // Load from localStorage on mount
   useEffect(() => {
+    const store = useEditorStore.getState();
+    
+    // Only restore if store is empty (avoid duplicates on reload)
+    if (store.clips.length > 0) {
+      return;
+    }
+    
     const saved = localStorage.getItem(STORAGE_KEY);
     const expiry = localStorage.getItem(EXPIRY_KEY);
     
@@ -20,13 +27,19 @@ export const useAutoSave = () => {
       if (now < expiryTime) {
         try {
           const data = JSON.parse(saved);
-          const store = useEditorStore.getState();
           
-          // Restore only clips and settings (not mediaItems since they don't have binary data)
-          data.clips?.forEach((clip: any) => store.addClip(clip));
-          if (data.globalSettings) store.updateGlobalSettings(data.globalSettings);
-          
-          console.log('Auto-save restored from localStorage');
+          // Only restore if we have clips to restore
+          if (data.clips && data.clips.length > 0) {
+            // Use loadProject to properly restore state without duplicates
+            store.loadProject({
+              clips: data.clips,
+              globalSettings: data.globalSettings,
+              mediaItems: [], // Can't restore media items (binary data)
+              projectName: store.projectName
+            });
+            
+            console.log('Auto-save restored from localStorage');
+          }
         } catch (error) {
           console.error('Error restoring auto-save:', error);
           localStorage.removeItem(STORAGE_KEY);
