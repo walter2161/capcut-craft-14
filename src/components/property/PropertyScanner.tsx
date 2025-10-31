@@ -18,69 +18,98 @@ export const PropertyScanner = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const extractPropertyDataWithAI = async (html: string): Promise<Partial<PropertyData>> => {
-    try {
-      // Limitar o tamanho do HTML para não exceder limites da API
-      const cleanHtml = html.slice(0, 10000);
+  const extractPropertyDataFromHTML = (html: string): Partial<PropertyData> => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    const data: Partial<PropertyData> = {
+      diferenciais: [],
+      descricaoAdicional: ''
+    };
+
+    // Procurar por .sub-details .detail e extrair valores
+    const detailElements = doc.querySelectorAll('.sub-details .detail, .detail');
+    
+    detailElements.forEach((detail) => {
+      const labelDiv = detail.querySelector('div:nth-child(2)');
+      const valueDiv = detail.querySelector('div.value, .value');
       
-      const prompt = `Analise o HTML de um anúncio de imóvel e extraia as seguintes informações em formato JSON.
-Procure especialmente por elementos como: area útil, quartos, suítes, vagas, banheiros, sacadas, tipo de imóvel, preço, bairro, cidade, estado.
-
-HTML do anúncio:
-${cleanHtml}
-
-Responda APENAS com um JSON no seguinte formato (sem texto adicional):
-{
-  "tipo": "Casa|Apartamento|Terreno|Comercial|Cobertura|Chácara",
-  "transacao": "Venda|Aluguel|Temporada",
-  "bairro": "nome do bairro",
-  "cidade": "nome da cidade", 
-  "estado": "sigla (ex: SP)",
-  "quartos": numero,
-  "banheiros": numero,
-  "vagas": numero,
-  "area": numero em m²,
-  "valor": numero (apenas número sem R$ ou pontos),
-  "condominio": numero ou null,
-  "iptu": numero ou null,
-  "diferenciais": ["lista", "de", "características"],
-  "descricaoAdicional": "breve descrição do imóvel"
-}`;
-
-      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'mistral-small-latest',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
-          max_tokens: 800,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Erro na API Mistral:', response.status);
-        return {};
+      if (!labelDiv || !valueDiv) return;
+      
+      const label = labelDiv.textContent?.trim().toLowerCase() || '';
+      const valueText = valueDiv.textContent?.trim() || '';
+      
+      // Extrair número do texto
+      const numberMatch = valueText.match(/(\d+(?:[.,]\d+)?)/);
+      const number = numberMatch ? parseFloat(numberMatch[1].replace(',', '.')) : 0;
+      
+      // Mapear labels para campos
+      if (label.includes('quarto') || label.includes('dormitório')) {
+        data.quartos = number;
+      } else if (label.includes('banheiro') || label.includes('wc')) {
+        data.banheiros = number;
+      } else if (label.includes('vaga') || label.includes('garagem')) {
+        data.vagas = number;
+      } else if (label.includes('área') || label.includes('area')) {
+        data.area = number;
+      } else if (label.includes('suíte') || label.includes('suite')) {
+        if (!data.diferenciais) data.diferenciais = [];
+        data.diferenciais.push(`${number} suíte${number > 1 ? 's' : ''}`);
+      } else if (label.includes('sacada') || label.includes('varanda')) {
+        if (!data.diferenciais) data.diferenciais = [];
+        data.diferenciais.push('Sacada');
       }
+    });
 
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      // Tentar extrair JSON do conteúdo
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const extractedData = JSON.parse(jsonMatch[0]);
-        return extractedData;
+    // Extrair preço
+    const priceElements = doc.querySelectorAll('.price, .valor, .preco, [class*="price"], [class*="valor"]');
+    for (const priceEl of priceElements) {
+      const priceText = priceEl.textContent || '';
+      const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
+      if (priceMatch) {
+        data.valor = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+        break;
       }
-      
-      return {};
-    } catch (error) {
-      console.error('Erro ao extrair dados com IA:', error);
-      return {};
     }
+
+    // Extrair endereço/localização
+    const locationElements = doc.querySelectorAll('.location, .endereco, .address, [class*="location"], [class*="endereco"]');
+    for (const locEl of locationElements) {
+      const locText = locEl.textContent?.trim() || '';
+      
+      // Tentar extrair bairro, cidade, estado
+      const parts = locText.split(/[,-]/);
+      if (parts.length >= 2) {
+        data.bairro = parts[0]?.trim() || '';
+        data.cidade = parts[1]?.trim() || '';
+        if (parts.length >= 3) {
+          data.estado = parts[2]?.trim().toUpperCase().slice(0, 2) || '';
+        }
+      }
+      break;
+    }
+
+    // Extrair tipo de imóvel do título ou classe
+    const titleElements = doc.querySelectorAll('h1, h2, .title, .titulo, [class*="title"]');
+    for (const titleEl of titleElements) {
+      const titleText = titleEl.textContent?.toLowerCase() || '';
+      if (titleText.includes('apartamento')) data.tipo = 'Apartamento';
+      else if (titleText.includes('casa')) data.tipo = 'Casa';
+      else if (titleText.includes('cobertura')) data.tipo = 'Cobertura';
+      else if (titleText.includes('terreno')) data.tipo = 'Terreno';
+      else if (titleText.includes('comercial') || titleText.includes('sala')) data.tipo = 'Comercial';
+      else if (titleText.includes('chácara') || titleText.includes('chacara')) data.tipo = 'Chácara';
+      
+      if (data.tipo) break;
+    }
+
+    // Extrair descrição
+    const descElements = doc.querySelectorAll('.description, .descricao, [class*="description"], [class*="descricao"]');
+    if (descElements.length > 0) {
+      data.descricaoAdicional = descElements[0].textContent?.trim().slice(0, 200) || '';
+    }
+
+    return data;
   };
 
   const extractImages = (html: string, baseUrl: string): string[] => {
@@ -181,12 +210,12 @@ A copy deve:
       const html = await response.text();
 
       toast({
-        title: 'Analisando com IA...',
-        description: 'Extraindo informações do imóvel com Mistral AI',
+        title: 'Extraindo dados...',
+        description: 'Lendo informações do imóvel',
       });
 
-      // Usar IA Mistral para extrair informações do HTML
-      const extractedData = await extractPropertyDataWithAI(html);
+      // Extrair dados diretamente do HTML (rápido)
+      const extractedData = extractPropertyDataFromHTML(html);
       
       // Extrair imagens
       const images = extractImages(html, url);
