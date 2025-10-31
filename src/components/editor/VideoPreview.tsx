@@ -23,25 +23,27 @@ export const VideoPreview = () => {
         if (!data.complete || data.naturalWidth === 0 || data.naturalHeight === 0) return null;
         return data;
       }
-      // If it's a string URL, load and cache
+      // If it's a string URL, try to load without CORS for preview
       if (typeof data === 'string') {
         const cached = imageCacheRef.current.get(data);
-        if (cached) {
-          if (!cached.complete || cached.naturalWidth === 0 || cached.naturalHeight === 0) return null;
+        if (cached && cached.complete && cached.naturalWidth > 0) {
           return cached;
         }
+        // Try to load without CORS restrictions for preview
         const img = new Image();
-        img.crossOrigin = 'anonymous';
         img.onload = () => {
           imageCacheRef.current.set(data, img);
-          // Trigger a re-render so the frame draws after load
           forceRerender((t) => t + 1);
         };
         img.onerror = () => {
-          // Leave uncached on error; preview will skip drawing
+          console.warn('Failed to load image for preview:', data);
         };
         img.src = data;
-        // Not ready yet this frame
+        imageCacheRef.current.set(data, img);
+        // Return immediately if dimensions are available, even if not complete
+        if (img.naturalWidth > 0 || img.width > 0) {
+          return img;
+        }
         return null;
       }
       return null;
