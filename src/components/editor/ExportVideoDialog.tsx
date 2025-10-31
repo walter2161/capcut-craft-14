@@ -201,6 +201,9 @@ export const ExportVideoDialog = () => {
       canvas.height = dimensions.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
+      // Desenha um frame inicial para garantir que o stream tenha conteúdo
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
       const frameInterval = 1000 / fps;
@@ -264,39 +267,33 @@ export const ExportVideoDialog = () => {
         };
       });
 
-      mediaRecorder.start(1000);
+      mediaRecorder.start(250);
 
-      const videoTrack = stream.getVideoTracks()[0];
+      const videoTrack = stream.getVideoTracks()[0] as any;
+      if (!videoTrack) {
+        console.error('Nenhuma video track encontrada no stream do canvas');
+        toast.error("Falha ao iniciar captura do canvas");
+      } else {
+        try { await (videoTrack as any).applyConstraints?.({ frameRate: fps }); } catch {}
+      }
 
-      await new Promise<void>((resolve) => {
-        let frame = 0;
-        const frameIntervalMs = frameInterval;
-        const timerId = setInterval(async () => {
-          try {
-            const time = frame * frameIntervalMs;
-            await renderFrame(ctx, time, canvas);
-            (videoTrack as any)?.requestFrame?.();
-            frame++;
-            setExportProgress(Math.min(100, Math.round((frame / totalFrames) * 100)));
-            if (frame >= totalFrames) {
-              clearInterval(timerId);
-              setTimeout(() => {
-                mediaRecorder.requestData?.();
-                mediaRecorder.stop();
-                resolve();
-              }, 120);
-            }
-          } catch (e) {
-            console.error('Erro ao renderizar frame:', e);
-            clearInterval(timerId);
-            try { mediaRecorder.stop(); } catch {}
-            resolve();
-          }
-        }, frameIntervalMs);
-      });
+      // Renderização sequencial (garante que cada frame seja desenhado antes do próximo)
+      for (let frame = 0; frame < totalFrames; frame++) {
+        const time = frame * frameInterval;
+        await renderFrame(ctx, time, canvas);
+        (videoTrack as any)?.requestFrame?.();
+        setExportProgress(Math.round((frame / totalFrames) * 100));
+        await new Promise((resolve) => setTimeout(resolve, frameInterval));
+      }
+
+      // Pequeno atraso para garantir que o último frame seja capturado
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      mediaRecorder.requestData?.();
+      mediaRecorder.stop();
 
       await stopped;
-      try { stream.getTracks().forEach(t => t.stop()); } catch {}
+      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+
     } catch (error) {
       console.error('Erro ao exportar vídeo:', error);
       toast.error("Erro ao exportar vídeo");
