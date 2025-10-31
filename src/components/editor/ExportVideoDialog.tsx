@@ -219,7 +219,20 @@ export const ExportVideoDialog = () => {
       const uniqueMediaIds = Array.from(new Set(videoClips.map(c => c.mediaId)));
       await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
 
-      const stream = previewCanvas.captureStream(fps);
+      // Definir canvas de origem: usar o preview se disponível, senão um canvas próprio
+      const sourceCanvas = previewCanvas || document.createElement('canvas');
+      let ctx: CanvasRenderingContext2D | null = null;
+      if (!previewCanvas) {
+        sourceCanvas.width = dimensions.width;
+        sourceCanvas.height = dimensions.height;
+        ctx = sourceCanvas.getContext('2d');
+        if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
+        // Frame inicial para garantir conteúdo no stream
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+      }
+
+      const stream = sourceCanvas.captureStream(fps);
       // Seleciona o MIME mais compatível disponível (prioriza VP8)
       const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
       const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
@@ -280,24 +293,31 @@ export const ExportVideoDialog = () => {
         try { await (videoTrack as any).applyConstraints?.({ frameRate: fps }); } catch {}
       }
 
-      // Usar o preview já renderizado: avançar o tempo no store e esperar o desenho
+      // Usar o preview já renderizado ou render interno
+      const usePreview = !!previewCanvas;
       const prevTime = currentTime;
       const prevPlaying = isPlaying;
-      setIsPlaying(false);
+      if (usePreview) setIsPlaying(false);
 
       const nextPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
       for (let frame = 0; frame < totalFrames; frame++) {
         const time = frame * frameInterval;
-        setCurrentTime(time);
-        await nextPaint();
+        if (usePreview) {
+          setCurrentTime(time);
+          await nextPaint();
+        } else {
+          await renderFrame(ctx!, time, sourceCanvas);
+        }
         (videoTrack as any)?.requestFrame?.();
         setExportProgress(Math.round((frame / totalFrames) * 100));
       }
 
       // Restaurar estado do player
-      setCurrentTime(prevTime);
-      setIsPlaying(prevPlaying);
+      if (usePreview) {
+        setCurrentTime(prevTime);
+        setIsPlaying(prevPlaying);
+      }
 
       // Pequeno atraso para garantir que o último frame seja capturado
       await new Promise((resolve) => setTimeout(resolve, 150));

@@ -265,11 +265,22 @@ A copy deve:
         description: 'Buscando informações do imóvel',
       });
 
-      // Fetch da página usando CORS proxy
-      const proxyUrl = 'https://api.allorigins.win/raw?url=';
-      const response = await fetch(proxyUrl + encodeURIComponent(url));
-      
-      if (!response.ok) {
+      // Fetch da página usando múltiplos proxies CORS (fallback automático)
+      const cleanUrl = url.trim();
+      const candidates = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(cleanUrl)}`,
+        `https://r.jina.ai/http://${cleanUrl.replace(/^https?:\/\//, '')}`,
+        `https://r.jina.ai/https://${cleanUrl.replace(/^https?:\/\//, '')}`,
+      ];
+
+      let response: Response | null = null;
+      for (const endpoint of candidates) {
+        try {
+          const r = await fetch(endpoint);
+          if (r.ok) { response = r; break; }
+        } catch {}
+      }
+      if (!response) {
         throw new Error('Erro ao buscar página');
       }
       
