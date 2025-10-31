@@ -9,6 +9,50 @@ export const VideoPreview = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const { clips, mediaItems, currentTime, isPlaying, globalSettings } = useEditorStore();
   const [zoom, setZoom] = useState(1);
+  const [, forceRerender] = useState(0);
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Resolve a drawable element for a media item (preloads images from URL strings)
+  const getDrawable = (item: { type: 'image' | 'video' | 'audio'; data: any }): HTMLImageElement | HTMLVideoElement | null => {
+    if (!item) return null;
+
+    if (item.type === 'image') {
+      const data = item.data;
+      // Already an HTMLImageElement and loaded
+      if (data instanceof HTMLImageElement) {
+        if (!data.complete || data.naturalWidth === 0 || data.naturalHeight === 0) return null;
+        return data;
+      }
+      // If it's a string URL, load and cache
+      if (typeof data === 'string') {
+        const cached = imageCacheRef.current.get(data);
+        if (cached) {
+          if (!cached.complete || cached.naturalWidth === 0 || cached.naturalHeight === 0) return null;
+          return cached;
+        }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          imageCacheRef.current.set(data, img);
+          // Trigger a re-render so the frame draws after load
+          forceRerender((t) => t + 1);
+        };
+        img.onerror = () => {
+          // Leave uncached on error; preview will skip drawing
+        };
+        img.src = data;
+        // Not ready yet this frame
+        return null;
+      }
+      return null;
+    }
+
+    if (item.type === 'video' && item.data instanceof HTMLVideoElement) {
+      return item.data as HTMLVideoElement;
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -146,7 +190,8 @@ export const VideoPreview = () => {
     }
 
     // Suporte para vídeo e imagem
-    const media = mediaItem.data;
+    const media = getDrawable(mediaItem);
+    if (!media) return;
     const timeInClip = time - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
     
@@ -188,19 +233,21 @@ export const VideoPreview = () => {
         
         // Desenhar a próxima imagem/vídeo (fundo)
         const nextMediaItem = mediaItems.find(m => m.id === nextClip.mediaId);
-        if (nextMediaItem && nextMediaItem.data) {
-          const nextMedia = nextMediaItem.data;
-          const nextImgProps = fitImageToCanvas(nextMedia, canvas);
-          
-          ctx.filter = 'none';
-          ctx.globalAlpha = 1;
-          
-          const nextScaledWidth = nextImgProps.drawWidth * nextClip.scale;
-          const nextScaledHeight = nextImgProps.drawHeight * nextClip.scale;
-          const nextOffsetX = (canvas.width - nextScaledWidth) / 2;
-          const nextOffsetY = (canvas.height - nextScaledHeight) / 2;
-          
-          ctx.drawImage(nextMedia, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
+        if (nextMediaItem) {
+          const nextMedia = getDrawable(nextMediaItem as any);
+          if (nextMedia) {
+            const nextImgProps = fitImageToCanvas(nextMedia, canvas);
+            
+            ctx.filter = 'none';
+            ctx.globalAlpha = 1;
+            
+            const nextScaledWidth = nextImgProps.drawWidth * nextClip.scale;
+            const nextScaledHeight = nextImgProps.drawHeight * nextClip.scale;
+            const nextOffsetX = (canvas.width - nextScaledWidth) / 2;
+            const nextOffsetY = (canvas.height - nextScaledHeight) / 2;
+            
+            ctx.drawImage(nextMedia, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
+          }
         }
         
         // Ajustar alpha da mídia atual para fade out
