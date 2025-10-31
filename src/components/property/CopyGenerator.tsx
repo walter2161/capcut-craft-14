@@ -72,7 +72,27 @@ A copy deve:
       toast.success('Copy gerada com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar copy:', error);
-      toast.error('Erro ao gerar copy. Verifique sua chave API.');
+      const cidade = propertyData.cidade || '';
+      const bairro = propertyData.bairro || '';
+      const tipo = propertyData.tipo || 'Imóvel';
+      const transacao = propertyData.transacao || 'Venda';
+      const valor = propertyData.valor ? `por R$ ${propertyData.valor.toLocaleString('pt-BR')}` : '';
+      const caracts = [
+        propertyData.quartos ? `${propertyData.quartos} quartos` : null,
+        propertyData.banheiros ? `${propertyData.banheiros} banheiros` : null,
+        propertyData.vagas ? `${propertyData.vagas} vagas` : null,
+        propertyData.area ? `${propertyData.area}m²` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const difs = propertyData.diferenciais && propertyData.diferenciais.length
+        ? `Destaques: ${propertyData.diferenciais.slice(0, 5).join(', ')}.\n`
+        : '';
+
+      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲\n\n#imoveis #${cidade.toLowerCase()}`;
+      setGeneratedCopy(fallback);
+      toast.success('Copy gerada (fallback)');
     } finally {
       setIsGenerating(false);
     }

@@ -14,7 +14,7 @@ export const PropertyScanner = () => {
   const [url, setUrl] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const { setPropertyData, setGeneratedCopy } = usePropertyStore();
-  const { addMediaItem } = useEditorStore();
+  const { addMediaItem, addClip, updateTotalDuration } = useEditorStore();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -216,7 +216,28 @@ A copy deve:
       return data.choices[0].message.content;
     } catch (error) {
       console.error('Erro ao gerar copy:', error);
-      return '';
+      const cidade = propertyData.cidade || '';
+      const bairro = propertyData.bairro || '';
+      const tipo = propertyData.tipo || 'Imóvel';
+      const transacao = propertyData.transacao || 'Venda';
+      const valor = propertyData.valor
+        ? `por R$ ${propertyData.valor.toLocaleString('pt-BR')}`
+        : '';
+      const caracts = [
+        propertyData.quartos ? `${propertyData.quartos} quartos` : null,
+        propertyData.banheiros ? `${propertyData.banheiros} banheiros` : null,
+        propertyData.vagas ? `${propertyData.vagas} vagas` : null,
+        propertyData.area ? `${propertyData.area}m²` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const difs = propertyData.diferenciais && propertyData.diferenciais.length
+        ? `Destaques: ${propertyData.diferenciais.slice(0, 5).join(', ')}.\n`
+        : '';
+
+      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲\n\n#imoveis #${cidade.toLowerCase()}`;
+      return fallback;
     }
   };
 
@@ -293,12 +314,14 @@ A copy deve:
         setGeneratedCopy(copy);
       }
 
-      // Adicionar imagens aos recursos
+      // Adicionar imagens aos recursos e à timeline
       if (images.length > 0) {
         toast({
           title: 'Adicionando imagens...',
           description: `${images.length} imagens encontradas`,
         });
+
+        const createdMedia: MediaItem[] = [];
 
         images.forEach((imageUrl, index) => {
           const mediaItem: MediaItem = {
@@ -308,8 +331,46 @@ A copy deve:
             data: imageUrl,
             thumbnail: imageUrl,
           };
-          
+          createdMedia.push(mediaItem);
           addMediaItem(mediaItem);
+        });
+
+        // Inserir automaticamente na timeline (track V1)
+        const editorState = useEditorStore.getState();
+        const defaultDur = editorState.globalSettings?.defaultImageDuration ?? 3000;
+        // Começar após o final atual da timeline
+        const baseStart =
+          editorState.clips.length > 0
+            ? Math.max(...editorState.clips.map(c => c.start + c.duration))
+            : 0;
+
+        let start = baseStart;
+        createdMedia.forEach((mi) => {
+          const clipId = `clip-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          addClip({
+            id: clipId,
+            type: 'image',
+            mediaId: mi.id,
+            track: 'V1',
+            start,
+            duration: defaultDur,
+            scale: 1.0,
+            brightness: 0,
+            contrast: 0,
+            volume: 1.0,
+            speed: 1.0,
+            opacity: 1.0,
+            transition: 'none',
+            transitionDuration: 0,
+          });
+          start += defaultDur;
+        });
+
+        updateTotalDuration();
+
+        toast({
+          title: 'Timeline atualizada',
+          description: `${createdMedia.length} imagens adicionadas à timeline`,
         });
       }
 
