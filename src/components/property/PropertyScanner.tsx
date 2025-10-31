@@ -113,50 +113,36 @@ export const PropertyScanner = () => {
   };
 
   const extractImages = (html: string, baseUrl: string): string[] => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
     const images: string[] = [];
     
-    // Procurar imagens na classe específica property-view--slides-inner
-    const slidesContainer = doc.querySelector('.property-view--slides-inner');
-    if (slidesContainer) {
-      const imgElements = slidesContainer.querySelectorAll('img');
-      imgElements.forEach(img => {
-        const imgEl = img as HTMLImageElement;
-        let src = imgEl.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-        if (src) {
-          // Converter URLs relativas para absolutas
-          if (src.startsWith('//')) {
-            src = 'https:' + src;
-          } else if (src.startsWith('/')) {
-            const urlObj = new URL(baseUrl);
-            src = urlObj.origin + src;
-          }
-          if (src.startsWith('http')) {
-            images.push(src);
-          }
-        }
-      });
-    }
+    // Detectar se é Markdown (r.jina.ai retorna Markdown ao invés de HTML)
+    const isMarkdown = html.includes('![Image') || html.match(/!\[.*?\]\(http/);
     
-    // Fallback: procurar em outras classes comuns de galeria se não encontrou nada
-    if (images.length === 0) {
-      const gallerySelectors = [
-        '.gallery img',
-        '.carousel img',
-        '.slides img',
-        '.photos img',
-        '.images img',
-        '[class*="slide"] img',
-        '[class*="gallery"] img'
-      ];
+    if (isMarkdown) {
+      // Extrair URLs de imagens do formato Markdown: ![alt](url)
+      const markdownImageRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
+      let match;
+      while ((match = markdownImageRegex.exec(html)) !== null) {
+        const imgUrl = match[1];
+        // Filtrar logos e ícones
+        if (!imgUrl.toLowerCase().includes('logo') && !imgUrl.toLowerCase().includes('icon') && !imgUrl.toLowerCase().includes('maps')) {
+          images.push(imgUrl);
+        }
+      }
+    } else {
+      // Parse como HTML (allorigins retorna HTML)
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
       
-      for (const selector of gallerySelectors) {
-        const imgElements = doc.querySelectorAll(selector);
+      // Procurar imagens na classe específica property-view--slides-inner
+      const slidesContainer = doc.querySelector('.property-view--slides-inner');
+      if (slidesContainer) {
+        const imgElements = slidesContainer.querySelectorAll('img');
         imgElements.forEach(img => {
           const imgEl = img as HTMLImageElement;
           let src = imgEl.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-          if (src && !src.includes('logo') && !src.includes('icon')) {
+          if (src) {
+            // Converter URLs relativas para absolutas
             if (src.startsWith('//')) {
               src = 'https:' + src;
             } else if (src.startsWith('/')) {
@@ -168,8 +154,40 @@ export const PropertyScanner = () => {
             }
           }
         });
+      }
+      
+      // Fallback: procurar em outras classes comuns de galeria se não encontrou nada
+      if (images.length === 0) {
+        const gallerySelectors = [
+          '.gallery img',
+          '.carousel img',
+          '.slides img',
+          '.photos img',
+          '.images img',
+          '[class*="slide"] img',
+          '[class*="gallery"] img'
+        ];
         
-        if (images.length > 0) break;
+        for (const selector of gallerySelectors) {
+          const imgElements = doc.querySelectorAll(selector);
+          imgElements.forEach(img => {
+            const imgEl = img as HTMLImageElement;
+            let src = imgEl.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+            if (src && !src.includes('logo') && !src.includes('icon')) {
+              if (src.startsWith('//')) {
+                src = 'https:' + src;
+              } else if (src.startsWith('/')) {
+                const urlObj = new URL(baseUrl);
+                src = urlObj.origin + src;
+              }
+              if (src.startsWith('http')) {
+                images.push(src);
+              }
+            }
+          });
+          
+          if (images.length > 0) break;
+        }
       }
     }
     
