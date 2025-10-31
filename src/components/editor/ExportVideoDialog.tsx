@@ -204,7 +204,9 @@ export const ExportVideoDialog = () => {
 
       const fps = globalSettings.videoFPS;
       const frameInterval = 1000 / fps;
-      const totalFrames = Math.ceil(totalDuration / frameInterval);
+      // Garante duração mínima para melhor compatibilidade de players (e evitar arquivo vazio)
+      const durationMs = Math.max(totalDuration, 2000);
+      const totalFrames = Math.max(1, Math.ceil(durationMs / frameInterval));
 
       // Precarregar todas as mídias necessárias para exportação
       const videoClips = clips.filter(c => c.track.startsWith('V'));
@@ -212,10 +214,14 @@ export const ExportVideoDialog = () => {
       await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
 
       const stream = canvas.captureStream(fps);
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 5000000,
-      });
+      // Seleciona o MIME mais compatível disponível (prioriza VP8)
+      const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
+      const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
+      const mimeType = supported ? candidateTypes.find(t => supported(t)) || '' : '';
+      const options: MediaRecorderOptions = mimeType
+        ? { mimeType, videoBitsPerSecond: 5_000_000 }
+        : { videoBitsPerSecond: 5_000_000 };
+      const mediaRecorder = new MediaRecorder(stream, options);
 
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
@@ -250,6 +256,9 @@ export const ExportVideoDialog = () => {
         await new Promise(resolve => setTimeout(resolve, frameInterval));
       }
 
+      // Pequeno atraso para garantir que o último frame seja capturado
+      await new Promise(resolve => setTimeout(resolve, 120));
+      mediaRecorder.requestData?.();
       mediaRecorder.stop();
       await stopped;
     } catch (error) {
