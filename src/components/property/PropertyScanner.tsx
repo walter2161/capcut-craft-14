@@ -117,25 +117,63 @@ export const PropertyScanner = () => {
     const doc = parser.parseFromString(html, 'text/html');
     const images: string[] = [];
     
-    // Procurar por imagens do imóvel
-    const imgElements = doc.querySelectorAll('img');
-    imgElements.forEach(img => {
-      let src = img.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-      if (src && !src.includes('logo') && !src.includes('icon')) {
-        // Converter URLs relativas para absolutas
-        if (src.startsWith('//')) {
-          src = 'https:' + src;
-        } else if (src.startsWith('/')) {
-          const urlObj = new URL(baseUrl);
-          src = urlObj.origin + src;
+    // Procurar imagens na classe específica property-view--slides-inner
+    const slidesContainer = doc.querySelector('.property-view--slides-inner');
+    if (slidesContainer) {
+      const imgElements = slidesContainer.querySelectorAll('img');
+      imgElements.forEach(img => {
+        const imgEl = img as HTMLImageElement;
+        let src = imgEl.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+        if (src) {
+          // Converter URLs relativas para absolutas
+          if (src.startsWith('//')) {
+            src = 'https:' + src;
+          } else if (src.startsWith('/')) {
+            const urlObj = new URL(baseUrl);
+            src = urlObj.origin + src;
+          }
+          if (src.startsWith('http')) {
+            images.push(src);
+          }
         }
-        if (src.startsWith('http')) {
-          images.push(src);
-        }
-      }
-    });
+      });
+    }
     
-    return images.slice(0, 10); // Limitar a 10 imagens
+    // Fallback: procurar em outras classes comuns de galeria se não encontrou nada
+    if (images.length === 0) {
+      const gallerySelectors = [
+        '.gallery img',
+        '.carousel img',
+        '.slides img',
+        '.photos img',
+        '.images img',
+        '[class*="slide"] img',
+        '[class*="gallery"] img'
+      ];
+      
+      for (const selector of gallerySelectors) {
+        const imgElements = doc.querySelectorAll(selector);
+        imgElements.forEach(img => {
+          const imgEl = img as HTMLImageElement;
+          let src = imgEl.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+          if (src && !src.includes('logo') && !src.includes('icon')) {
+            if (src.startsWith('//')) {
+              src = 'https:' + src;
+            } else if (src.startsWith('/')) {
+              const urlObj = new URL(baseUrl);
+              src = urlObj.origin + src;
+            }
+            if (src.startsWith('http')) {
+              images.push(src);
+            }
+          }
+        });
+        
+        if (images.length > 0) break;
+      }
+    }
+    
+    return images.slice(0, 20); // Limitar a 20 imagens
   };
 
   const generateCopyWithAI = async (propertyData: Partial<PropertyData>) => {
