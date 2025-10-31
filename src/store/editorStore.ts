@@ -98,11 +98,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     )
   })),
 
-  removeClip: (id) => set((state) => ({
-    clips: state.clips.filter(clip => clip.id !== id),
-    selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
-    selectedClipIds: state.selectedClipIds.filter(clipId => clipId !== id)
-  })),
+  removeClip: (id) => set((state) => {
+    const newClips = state.clips.filter(clip => clip.id !== id);
+    const newTotal = newClips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 0);
+    return {
+      clips: newClips,
+      totalDuration: newTotal,
+      selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
+      selectedClipIds: state.selectedClipIds.filter(clipId => clipId !== id)
+    };
+  }),
 
   duplicateClip: (id) => set((state) => {
     const clipToDuplicate = state.clips.find(c => c.id === id);
@@ -192,22 +197,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   }),
 
   resetProject: () => {
-    set({
-      mediaItems: [],
-      clips: [],
-      selectedClipId: null,
-      selectedClipIds: [],
-      currentTime: 0,
-      totalDuration: 0,
-      projectName: 'Projeto Sem Título',
-    });
-    
-    // Limpar também o localStorage
+    // Limpar também o localStorage primeiro, para evitar rehidratação acidental
     try {
       localStorage.removeItem('video-editor-autosave');
       localStorage.removeItem('video-editor-autosave-expiry');
     } catch (error) {
       console.error('Error clearing localStorage:', error);
     }
+
+    set({
+      mediaItems: [],
+      clips: [],
+      selectedClipId: null,
+      selectedClipIds: [],
+      isPlaying: false,
+      currentTime: 0,
+      totalDuration: 0,
+      projectName: 'Projeto Sem Título',
+    });
   },
 }));
