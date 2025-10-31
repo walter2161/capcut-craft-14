@@ -60,6 +60,7 @@ interface EditorState {
   setProjectName: (name: string) => void;
   loadProject: (data: any) => void;
   resetProject: () => void;
+  clearTimelineAndMedia: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -216,4 +217,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       projectName: 'Post Imóvel 9:16',
     });
   },
+
+  clearTimelineAndMedia: () => set({
+    mediaItems: [],
+    clips: [],
+    selectedClipId: null,
+    selectedClipIds: [],
+    currentTime: 0,
+    totalDuration: 0,
+  }),
 }));

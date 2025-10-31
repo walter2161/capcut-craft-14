@@ -14,7 +14,7 @@ export const PropertyScanner = () => {
   const [url, setUrl] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const { setPropertyData, setGeneratedCopy } = usePropertyStore();
-  const { addMediaItem, addClip, updateTotalDuration } = useEditorStore();
+  const { addMediaItem, addClip, updateTotalDuration, clearTimelineAndMedia } = useEditorStore();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -310,6 +310,9 @@ A copy deve:
       };
 
       setPropertyData(finalData);
+      
+      // Limpar timeline e mídia antes de adicionar novas imagens
+      clearTimelineAndMedia();
       
       // Atualizar nome do projeto no editor
       const { setProjectName } = useEditorStore.getState();
