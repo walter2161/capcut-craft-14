@@ -202,168 +202,113 @@ export const ExportVideoDialog = () => {
     setExportProgress(0);
 
     try {
-      // Usar o canvas do Preview como fonte do vídeo
-      const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
-      if (!previewCanvas) {
-        throw new Error('Canvas de preview não encontrado. Abra o editor e tente novamente.');
-      }
-
-      // Garantir dimensões corretas (o Preview já usa as mesmas dimensões)
       const dimensions = getVideoDimensions();
-      if (previewCanvas.width !== dimensions.width || previewCanvas.height !== dimensions.height) {
-        previewCanvas.width = dimensions.width;
-        previewCanvas.height = dimensions.height;
-      }
-
       const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
-      const frameInterval = 1000 / fps;
-      // Garante duração mínima para melhor compatibilidade de players (e evitar arquivo vazio)
       const durationMs = Math.max(totalDuration, 2000);
-      const totalFrames = Math.max(1, Math.ceil(durationMs / frameInterval));
 
-      // Precarregar todas as mídias necessárias para exportação
+      // Criar canvas dedicado para exportação
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = dimensions.width;
+      exportCanvas.height = dimensions.height;
+      const ctx = exportCanvas.getContext('2d');
+      if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
+
+      // Frame inicial
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+      // Precarregar mídias
       const videoClips = clips.filter(c => c.track.startsWith('V'));
       const uniqueMediaIds = Array.from(new Set(videoClips.map(c => c.mediaId)));
       const preloadResults = await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
       const failed = preloadResults.filter(r => !r).length;
       if (failed > 0) {
-        toast.warning(`Algumas mídias não puderam ser preparadas para exportação (CORS): ${failed}`);
+        toast.warning(`Algumas mídias não puderam ser preparadas (CORS): ${failed}`);
       }
 
-      // Definir canvas de origem: usar o preview se disponível, senão um canvas próprio
-      const sourceCanvas = previewCanvas || document.createElement('canvas');
-      let ctx: CanvasRenderingContext2D | null = null;
-      if (!previewCanvas) {
-        sourceCanvas.width = dimensions.width;
-        sourceCanvas.height = dimensions.height;
-        ctx = sourceCanvas.getContext('2d');
-        if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
-        // Frame inicial para garantir conteúdo no stream
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-      }
-
-      // Preparar canvas de exportação e stream (com fallback seguro se o preview estiver "tainted")
-      let usePreviewFlag = !!previewCanvas;
-      let exportCanvas: HTMLCanvasElement = sourceCanvas;
-      let stream: MediaStream;
-      try {
-        stream = exportCanvas.captureStream(fps);
-      } catch (err) {
-        // Fallback: se o canvas do preview estiver "tainted" por CORS, usa um canvas interno limpo
-        if (previewCanvas) {
-          usePreviewFlag = false;
-          exportCanvas = document.createElement('canvas');
-          exportCanvas.width = dimensions.width;
-          exportCanvas.height = dimensions.height;
-          ctx = exportCanvas.getContext('2d');
-          if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-          try {
-            stream = exportCanvas.captureStream(fps);
-            toast.info('Usando renderização interna segura para exportação (CORS).');
-          } catch (e) {
-            throw e;
-          }
-        } else {
-          throw err as any;
-        }
-      }
-
-      // Seleciona o MIME mais compatível disponível (prioriza VP8)
+      // Capturar stream do canvas
+      const stream = exportCanvas.captureStream(fps);
+      
+      // Configurar MediaRecorder
       const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
       const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
-      const mimeType = supported ? candidateTypes.find(t => supported(t)) || '' : '';
-      const options: MediaRecorderOptions = mimeType
-        ? { mimeType, videoBitsPerSecond: 5_000_000 }
-        : { videoBitsPerSecond: 5_000_000 };
-      const mediaRecorder = new MediaRecorder(stream, options);
-
-      mediaRecorder.onerror = (e: any) => {
-        console.error('MediaRecorder error:', e);
-        toast.error("Falha ao gravar vídeo (MediaRecorder).");
-      };
+      const mimeType = supported ? candidateTypes.find(t => supported(t)) || 'video/webm' : 'video/webm';
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 5_000_000
+      });
 
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
+      mediaRecorder.onerror = (e: any) => {
+        console.error('MediaRecorder error:', e);
+        toast.error("Falha ao gravar vídeo");
+      };
+
       const stopped = new Promise<void>((resolve) => {
         mediaRecorder.onstop = () => {
-          try {
-            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
-            if (!blob || blob.size < 1024) {
-              console.error('Blob de vídeo vazio ou muito pequeno:', { size: blob?.size, chunks: chunks.length });
-              toast.error("Falha ao exportar: arquivo de vídeo ficou vazio.");
-              setIsExporting(false);
-              resolve();
-              return;
-            }
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.webm`;
-            a.click();
-            URL.revokeObjectURL(url);
-            setIsExporting(false);
-            setExportProgress(100);
-            toast.success("Vídeo exportado com sucesso!");
-            setTimeout(() => setIsOpen(false), 1500);
-            resolve();
-          } catch (err) {
-            console.error('Erro ao finalizar exportação:', err);
-            toast.error("Erro ao finalizar exportação");
+          const blob = new Blob(chunks, { type: mimeType });
+          if (blob.size < 1024) {
+            toast.error("Arquivo de vídeo vazio");
             setIsExporting(false);
             resolve();
+            return;
           }
+          
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+          
+          toast.success("Vídeo exportado com sucesso!");
+          setIsExporting(false);
+          setExportProgress(100);
+          setTimeout(() => setIsOpen(false), 1500);
+          resolve();
         };
       });
 
-      mediaRecorder.start(250);
+      // Iniciar gravação
+      mediaRecorder.start();
+      
+      // Renderizar frames usando setInterval (como no código de referência)
+      const frameIntervalMs = 1000 / fps;
+      const startTimestamp = performance.now();
+      let frameCount = 0;
 
-      const videoTrack = stream.getVideoTracks()[0] as any;
-      if (!videoTrack) {
-        console.error('Nenhuma video track encontrada no stream do canvas');
-        toast.error("Falha ao iniciar captura do canvas");
-      } else {
-        try { await (videoTrack as any).applyConstraints?.({ frameRate: fps }); } catch {}
-      }
-
-      // Usar o preview já renderizado ou render interno
-      let usePreview = usePreviewFlag;
-      const prevTime = currentTime;
-      const prevPlaying = isPlaying;
-      if (usePreview) setIsPlaying(false);
-
-      const nextPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-
-      for (let frame = 0; frame < totalFrames; frame++) {
-        const time = frame * frameInterval;
-        if (usePreview) {
-          setCurrentTime(time);
-          await nextPaint();
-        } else {
-          await renderFrame(ctx!, time, exportCanvas);
-        }
-        (videoTrack as any)?.requestFrame?.();
-        setExportProgress(Math.round((frame / totalFrames) * 100));
-      }
-
-      // Restaurar estado do player
-      if (usePreview) {
-        setCurrentTime(prevTime);
-        setIsPlaying(prevPlaying);
-      }
-
-      // Pequeno atraso para garantir que o último frame seja capturado
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      mediaRecorder.requestData?.();
-      mediaRecorder.stop();
+      await new Promise<void>((resolve) => {
+        const recordingLoop = setInterval(() => {
+          const virtualTimestamp = performance.now() - startTimestamp;
+          
+          // Renderizar frame
+          renderFrame(ctx, virtualTimestamp, exportCanvas);
+          
+          // Atualizar progresso
+          const progress = Math.min(100, (virtualTimestamp / durationMs) * 100);
+          setExportProgress(Math.round(progress));
+          frameCount++;
+          
+          // Verificar se concluiu
+          if (virtualTimestamp >= durationMs) {
+            clearInterval(recordingLoop);
+            
+            // Pequeno delay para garantir captura do último frame
+            setTimeout(() => {
+              mediaRecorder.stop();
+              stream.getTracks().forEach(t => t.stop());
+              resolve();
+            }, 200);
+          }
+        }, frameIntervalMs);
+      });
 
       await stopped;
-      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
 
     } catch (error) {
       console.error('Erro ao exportar vídeo:', error);
