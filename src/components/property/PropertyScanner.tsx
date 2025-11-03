@@ -233,6 +233,66 @@ export const PropertyScanner = () => {
     return images.slice(0, 20); // Limitar a 20 imagens
   };
 
+  const generateScriptWithAI = async (propertyData: Partial<PropertyData>) => {
+    try {
+      const prompt = `Crie um roteiro profissional para narração de vídeo sobre este imóvel para redes sociais (TikTok/Instagram Reels):
+
+Tipo: ${propertyData.tipo}
+Transação: ${propertyData.transacao}
+Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
+Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
+Valor: R$ ${propertyData.valor?.toLocaleString('pt-BR')}
+${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
+Diferenciais: ${propertyData.diferenciais?.join(', ') || 'Imóvel de qualidade'}
+
+O roteiro deve ter:
+- INÍCIO: Gancho forte e impactante (2-3 frases que prendem atenção)
+- MEIO: Desenvolvimento com detalhes principais do imóvel e localização (3-4 frases)
+- FIM: Call-to-action claro e urgente (1-2 frases)
+
+Características do roteiro:
+- Linguagem clara, natural e conversacional
+- Tom entusiasmado mas profissional
+- Entre 60-80 palavras (para 30-40 segundos de narração)
+- Sem emojis ou hashtags (apenas texto para narração)
+- Frases curtas e diretas
+- Use os dados reais do imóvel fornecidos acima`;
+
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'mistral-small-latest',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 400,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Erro ao gerar roteiro');
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Erro ao gerar roteiro:', error);
+      
+      const tipo = propertyData.tipo || 'Imóvel';
+      const cidade = propertyData.cidade || '';
+      const bairro = propertyData.bairro || '';
+      const quartos = propertyData.quartos || 0;
+      const valor = propertyData.valor ? `R$ ${propertyData.valor.toLocaleString('pt-BR')}` : '';
+      
+      return `Você está procurando o ${tipo.toLowerCase()} perfeito em ${bairro}? Então presta atenção!
+
+Este ${tipo.toLowerCase()} incrível tem ${quartos} quartos e está localizado em ${cidade}. Amplo, bem localizado e com acabamento de qualidade. ${valor ? `Por apenas ${valor}.` : ''}
+
+Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. Esse imóvel não vai ficar disponível por muito tempo!`;
+    }
+  };
+
   const generateCopyWithAI = async (propertyData: Partial<PropertyData>) => {
     try {
       const prompt = `Com base nas informações do imóvel abaixo, crie uma copy persuasiva e atraente para um post de rede social (Instagram/TikTok):
@@ -496,15 +556,87 @@ A copy deve:
         }
       }
 
+      // Gerar roteiro automaticamente
       toast({
-        title: 'Sucesso!',
-        description: 'Imóvel escaneado e formulário preenchido',
+        title: 'Gerando roteiro...',
+        description: 'Criando roteiro com IA',
+      });
+
+      const script = await generateScriptWithAI(finalData);
+      
+      // Converter roteiro em áudio automaticamente
+      if (script && (window as any).puter) {
+        toast({
+          title: 'Gerando áudio...',
+          description: 'Convertendo roteiro em narração',
+        });
+
+        try {
+          const audioBlob = await (window as any).puter.ai.txt2speech(script);
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Adicionar à biblioteca de mídia
+          const mediaId = `audio-script-${Date.now()}`;
+          addMediaItem({
+            id: mediaId,
+            type: 'audio',
+            name: 'Narração do Roteiro',
+            data: audioBuffer,
+            duration: audioBuffer.duration * 1000,
+            audioBlob // Armazenar blob para download
+          });
+
+          // Adicionar à timeline
+          const audioClips = useEditorStore.getState().clips.filter(c => c.type === 'audio' && c.track === 'A1');
+          const lastPosition = audioClips.reduce((max, clip) => 
+            Math.max(max, clip.start + clip.duration), 0
+          );
+
+          addClip({
+            id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+            type: 'audio',
+            mediaId,
+            track: 'A1',
+            start: lastPosition,
+            duration: audioBuffer.duration * 1000,
+            scale: 1,
+            brightness: 0,
+            contrast: 0,
+            volume: 1,
+            speed: 1,
+            opacity: 1,
+            transition: 'none',
+            transitionDuration: 0
+          });
+
+          updateTotalDuration();
+          await audioContext.close();
+
+          toast({
+            title: 'Sucesso!',
+            description: 'Roteiro e áudio adicionados automaticamente',
+          });
+        } catch (error) {
+          console.error('Erro ao gerar áudio:', error);
+          toast({
+            title: 'Aviso',
+            description: 'Roteiro gerado, mas falha ao criar áudio',
+            variant: 'destructive',
+          });
+        }
+      }
+
+      toast({
+        title: 'Concluído!',
+        description: 'Imóvel escaneado e pronto para edição',
       });
 
       // Aguardar um pouco e navegar para o editor
       setTimeout(() => {
         navigate('/editor');
-      }, 1500);
+      }, 2000);
 
     } catch (error) {
       console.error('Erro ao escanear:', error);
