@@ -24,12 +24,12 @@ export const ExportVideoDialog = () => {
   const getVideoDimensions = () => {
     switch (globalSettings.videoFormat) {
       case '9:16':
-        return { width: 720, height: 1280 };
+        return { width: 1080, height: 1920 };
       case '1:1':
         return { width: 1080, height: 1080 };
       case '16:9':
       default:
-        return { width: 1280, height: 720 };
+        return { width: 1920, height: 1080 };
     }
   };
 
