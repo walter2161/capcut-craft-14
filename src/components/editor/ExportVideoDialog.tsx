@@ -70,35 +70,42 @@ export const ExportVideoDialog = () => {
         return item.data;
       }
       if (typeof item.data === 'string') {
-        const img = new Image();
-        // Tentar evitar canvas "tainted" quando possível
-        img.crossOrigin = 'anonymous';
-        const src = item.data;
-        const load = () => new Promise<HTMLImageElement>((resolve, reject) => {
+        const src = item.data as string;
+
+        const loadWith = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.onload = () => resolve(img);
           img.onerror = () => reject(new Error('Falha ao carregar imagem para exportação'));
-          img.src = src;
+          img.src = url;
         });
-        try {
-          const loaded = await load();
-          drawableCache.set(mediaId, loaded);
-          return loaded;
-        } catch {
-          // Tentativa sem crossOrigin como fallback
-          const fallback = new Image();
-          const load2 = () => new Promise<HTMLImageElement>((resolve, reject) => {
-            fallback.onload = () => resolve(fallback);
-            fallback.onerror = () => reject(new Error('Falha ao carregar imagem'));
-            fallback.src = src;
-          });
+
+        const buildWeserv = (u: string) => {
           try {
-            const loaded2 = await load2();
-            drawableCache.set(mediaId, loaded2);
-            return loaded2;
+            const stripped = u.replace(/^https?:\/\//, '');
+            return `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}`;
           } catch {
-            return null;
+            return '';
+          }
+        };
+
+        const proxyCandidates = [
+          src,
+          buildWeserv(src),
+          `https://cors.isomorphic-git.org/${src}`,
+        ].filter(Boolean) as string[];
+
+        for (const candidate of proxyCandidates) {
+          try {
+            const loaded = await loadWith(candidate);
+            drawableCache.set(mediaId, loaded);
+            return loaded;
+          } catch {
+            // tenta próximo candidato
           }
         }
+        // Se todas as tentativas falharem, retorna null para evitar "taint" no canvas
+        return null;
       }
       return null;
     }
@@ -217,7 +224,11 @@ export const ExportVideoDialog = () => {
       // Precarregar todas as mídias necessárias para exportação
       const videoClips = clips.filter(c => c.track.startsWith('V'));
       const uniqueMediaIds = Array.from(new Set(videoClips.map(c => c.mediaId)));
-      await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
+      const preloadResults = await Promise.all(uniqueMediaIds.map(id => loadDrawable(id)));
+      const failed = preloadResults.filter(r => !r).length;
+      if (failed > 0) {
+        toast.warning(`Algumas mídias não puderam ser preparadas para exportação (CORS): ${failed}`);
+      }
 
       // Definir canvas de origem: usar o preview se disponível, senão um canvas próprio
       const sourceCanvas = previewCanvas || document.createElement('canvas');
@@ -232,7 +243,34 @@ export const ExportVideoDialog = () => {
         ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
       }
 
-      const stream = sourceCanvas.captureStream(fps);
+      // Preparar canvas de exportação e stream (com fallback seguro se o preview estiver "tainted")
+      let usePreviewFlag = !!previewCanvas;
+      let exportCanvas: HTMLCanvasElement = sourceCanvas;
+      let stream: MediaStream;
+      try {
+        stream = exportCanvas.captureStream(fps);
+      } catch (err) {
+        // Fallback: se o canvas do preview estiver "tainted" por CORS, usa um canvas interno limpo
+        if (previewCanvas) {
+          usePreviewFlag = false;
+          exportCanvas = document.createElement('canvas');
+          exportCanvas.width = dimensions.width;
+          exportCanvas.height = dimensions.height;
+          ctx = exportCanvas.getContext('2d');
+          if (!ctx) throw new Error('Não foi possível criar contexto do canvas');
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+          try {
+            stream = exportCanvas.captureStream(fps);
+            toast.info('Usando renderização interna segura para exportação (CORS).');
+          } catch (e) {
+            throw e;
+          }
+        } else {
+          throw err as any;
+        }
+      }
+
       // Seleciona o MIME mais compatível disponível (prioriza VP8)
       const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
       const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
@@ -266,7 +304,7 @@ export const ExportVideoDialog = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}.webm`;
+            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.webm`;
             a.click();
             URL.revokeObjectURL(url);
             setIsExporting(false);
@@ -294,7 +332,7 @@ export const ExportVideoDialog = () => {
       }
 
       // Usar o preview já renderizado ou render interno
-      const usePreview = !!previewCanvas;
+      let usePreview = usePreviewFlag;
       const prevTime = currentTime;
       const prevPlaying = isPlaying;
       if (usePreview) setIsPlaying(false);
@@ -307,7 +345,7 @@ export const ExportVideoDialog = () => {
           setCurrentTime(time);
           await nextPaint();
         } else {
-          await renderFrame(ctx!, time, sourceCanvas);
+          await renderFrame(ctx!, time, exportCanvas);
         }
         (videoTrack as any)?.requestFrame?.();
         setExportProgress(Math.round((frame / totalFrames) * 100));
