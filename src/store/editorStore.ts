@@ -7,7 +7,6 @@ export interface MediaItem {
   data: any;
   duration?: number;
   thumbnail?: string;
-  audioBlob?: Blob; // Para permitir download do áudio
 }
 
 export interface Clip {

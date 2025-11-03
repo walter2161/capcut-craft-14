@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Volume2, RefreshCw, Download } from 'lucide-react';
+import { Sparkles, Volume2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/store/editorStore';
 import { usePropertyStore } from '@/store/propertyStore';
@@ -12,14 +12,8 @@ export const ScriptPanel = () => {
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
-  const { addMediaItem, addClip, clips, updateTotalDuration, mediaItems } = useEditorStore();
+  const { addMediaItem, addClip, clips, updateTotalDuration } = useEditorStore();
   const { propertyData } = usePropertyStore();
-
-  // Buscar áudio existente do roteiro
-  const scriptAudio = mediaItems.find(item => 
-    item.type === 'audio' && item.name === 'Narração do Roteiro' && item.audioBlob
-  );
-  const audioDownloadUrl = scriptAudio?.audioBlob ? URL.createObjectURL(scriptAudio.audioBlob) : null;
 
   const generateScript = async () => {
     if (!propertyData) {
@@ -140,8 +134,7 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
         type: 'audio',
         name: 'Narração do Roteiro',
         data: audioBuffer,
-        duration: audioBuffer.duration * 1000,
-        audioBlob // Armazenar blob para download
+        duration: audioBuffer.duration * 1000
       });
 
       // Adicionar à timeline
@@ -235,20 +228,6 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
           </>
         )}
       </Button>
-
-      {audioDownloadUrl && (
-        <Button
-          variant="outline"
-          className="w-full"
-          size="sm"
-          asChild
-        >
-          <a href={audioDownloadUrl} download="narracao-roteiro.mp3">
-            <Download className="w-4 h-4 mr-2" />
-            Baixar Áudio
-          </a>
-        </Button>
-      )}
 
       <p className="text-xs text-muted-foreground">
         O áudio será automaticamente adicionado à timeline
