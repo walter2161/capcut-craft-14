@@ -107,148 +107,101 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       return;
     }
 
-    if (!('speechSynthesis' in window)) {
-      toast.error('Seu navegador não suporta síntese de voz');
-      return;
-    }
-
     setIsConverting(true);
-    toast.info('Gerando áudio da narração... Aguarde até o fim.');
+    toast.info('Gerando áudio da narração...');
 
     try {
-      // Aguardar as vozes carregarem
-      await new Promise<void>((resolve) => {
-        if (speechSynthesis.getVoices().length > 0) {
-          resolve();
-        } else {
-          speechSynthesis.onvoiceschanged = () => resolve();
-        }
-      });
-
-      // Criar AudioContext e MediaStreamDestination
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const destination = audioContext.createMediaStreamDestination();
+      console.log('Iniciando conversão de texto para áudio com Google TTS...');
       
-      // Configurar síntese de voz
-      const utterance = new SpeechSynthesisUtterance(script);
-      utterance.lang = 'pt-BR';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.01; // Volume muito baixo para não reproduzir audível
+      // Usar Google Cloud Text-to-Speech API
+      const response = await fetch(
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyCGNKs7LHU48mB2IHSKcLBM3NYxhKV67GQ`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: { text: script },
+            voice: {
+              languageCode: 'pt-BR',
+              name: 'pt-BR-Standard-A',
+              ssmlGender: 'FEMALE'
+            },
+            audioConfig: {
+              audioEncoding: 'MP3',
+              pitch: 0,
+              speakingRate: 1.0
+            }
+          })
+        }
+      );
 
-      // Usar voz em português
-      const voices = speechSynthesis.getVoices();
-      const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt'));
-      if (ptVoice) {
-        utterance.voice = ptVoice;
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro na API do Google:', errorData);
+        throw new Error('Erro ao gerar áudio');
       }
 
-      // Criar um oscilador silencioso apenas para manter o stream ativo
-      const oscillator = audioContext.createOscillator();
-      oscillator.frequency.value = 0;
-      oscillator.connect(destination);
-      oscillator.start();
+      const data = await response.json();
+      const audioContent = data.audioContent;
+      
+      // Converter base64 para Blob
+      const binaryString = atob(audioContent);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
+      
+      console.log('Áudio gerado com sucesso:', audioBlob);
 
-      // MediaRecorder para capturar
-      const mediaRecorder = new MediaRecorder(destination.stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-      const audioChunks: Blob[] = [];
+      // Criar AudioBuffer a partir do blob
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
-
-      const processingPromise = new Promise<void>((resolve, reject) => {
-        mediaRecorder.onstop = async () => {
-          try {
-            oscillator.stop();
-            
-            if (audioChunks.length === 0) {
-              throw new Error('Nenhum áudio foi capturado');
-            }
-
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            // Adicionar à biblioteca de mídia
-            const mediaId = `audio-script-${Date.now()}`;
-            addMediaItem({
-              id: mediaId,
-              type: 'audio',
-              name: 'Narração do Roteiro',
-              data: audioBuffer,
-              duration: audioBuffer.duration * 1000,
-              audioBlob: audioBlob
-            });
-
-            // Adicionar à timeline
-            const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
-            const lastPosition = audioClips.reduce((max, clip) => 
-              Math.max(max, clip.start + clip.duration), 0
-            );
-
-            addClip({
-              id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-              type: 'audio',
-              mediaId,
-              track: 'A1',
-              start: lastPosition,
-              duration: audioBuffer.duration * 1000,
-              scale: 1,
-              brightness: 0,
-              contrast: 0,
-              volume: 1,
-              speed: 1,
-              opacity: 1,
-              transition: 'none',
-              transitionDuration: 0
-            });
-
-            updateTotalDuration();
-            await audioContext.close();
-            toast.success('Áudio adicionado à timeline!');
-            resolve();
-          } catch (err) {
-            console.error('Erro ao processar áudio:', err);
-            reject(err);
-          }
-        };
+      // Adicionar à biblioteca de mídia
+      const mediaId = `audio-script-${Date.now()}`;
+      addMediaItem({
+        id: mediaId,
+        type: 'audio',
+        name: 'Narração do Roteiro',
+        data: audioBuffer,
+        duration: audioBuffer.duration * 1000,
+        audioBlob: audioBlob
       });
 
-      // Iniciar gravação
-      mediaRecorder.start();
+      // Adicionar à timeline
+      const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
+      const lastPosition = audioClips.reduce((max, clip) => 
+        Math.max(max, clip.start + clip.duration), 0
+      );
 
-      // Criar promise para o utterance
-      const speechPromise = new Promise<void>((resolve, reject) => {
-        utterance.onend = () => {
-          setTimeout(() => {
-            mediaRecorder.stop();
-            resolve();
-          }, 1000);
-        };
-
-        utterance.onerror = (event) => {
-          console.error('Erro na síntese:', event);
-          mediaRecorder.stop();
-          reject(new Error('Erro ao sintetizar voz'));
-        };
+      addClip({
+        id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+        type: 'audio',
+        mediaId,
+        track: 'A1',
+        start: lastPosition,
+        duration: audioBuffer.duration * 1000,
+        scale: 1,
+        brightness: 0,
+        contrast: 0,
+        volume: 1,
+        speed: 1,
+        opacity: 1,
+        transition: 'none',
+        transitionDuration: 0
       });
 
-      // Falar o texto
-      speechSynthesis.speak(utterance);
-
-      // Aguardar processamento completo
-      await speechPromise;
-      await processingPromise;
-
+      updateTotalDuration();
+      await audioContext.close();
+      
+      toast.success('Áudio adicionado à timeline!');
     } catch (error) {
-      console.error('Erro ao converter áudio:', error);
-      toast.error('Erro ao gerar áudio. Verifique as permissões do navegador.');
+      console.error('Erro ao converter para áudio:', error);
+      toast.error('Erro ao gerar áudio. Tente novamente.');
     } finally {
       setIsConverting(false);
     }
