@@ -7,6 +7,7 @@ export interface MediaItem {
   data: any;
   duration?: number;
   thumbnail?: string;
+  audioBlob?: Blob;
 }
 
 export interface Clip {

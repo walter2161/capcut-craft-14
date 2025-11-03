@@ -350,17 +350,30 @@ export const ResourcePanel = () => {
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeMediaItem(item.id);
-                      toast.success(`"${item.name}" removido`);
-                    }}
-                    className="bg-red-500 text-white text-xs w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600 shrink-0"
-                    title="Deletar mídia"
-                  >
-                    ×
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {item.audioBlob && (
+                      <a
+                        href={URL.createObjectURL(item.audioBlob)}
+                        download={`${item.name}.mp3`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/90"
+                        title="Baixar áudio"
+                      >
+                        ⬇
+                      </a>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeMediaItem(item.id);
+                        toast.success(`"${item.name}" removido`);
+                      }}
+                      className="bg-red-500 text-white text-xs w-4 h-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                      title="Deletar mídia"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

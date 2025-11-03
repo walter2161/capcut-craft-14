@@ -182,7 +182,8 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
               type: 'audio',
               name: 'Narração do Roteiro',
               data: audioBuffer,
-              duration: audioBuffer.duration * 1000
+              duration: audioBuffer.duration * 1000,
+              audioBlob: audioBlob
             });
 
             // Adicionar à timeline
