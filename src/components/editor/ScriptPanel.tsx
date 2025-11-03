@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Volume2, RefreshCw } from 'lucide-react';
+import { Sparkles, Volume2, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/store/editorStore';
 import { usePropertyStore } from '@/store/propertyStore';
@@ -12,6 +12,7 @@ export const ScriptPanel = () => {
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const { addMediaItem, addClip, clips, updateTotalDuration } = useEditorStore();
   const { propertyData } = usePropertyStore();
 
@@ -118,10 +119,18 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
 
     try {
       // Usar Puter.js para gerar áudio
-      const audioBlob = await (window as any).puter.ai.txt2speech(script);
+      const generatedAudioBlob = await (window as any).puter.ai.txt2speech(script);
+      
+      // Verificar se o resultado é um Blob válido
+      if (!(generatedAudioBlob instanceof Blob)) {
+        throw new Error('Puter.js não retornou um Blob válido');
+      }
+
+      // Armazenar o blob para download
+      setAudioBlob(generatedAudioBlob);
       
       // Converter blob para ArrayBuffer
-      const arrayBuffer = await audioBlob.arrayBuffer();
+      const arrayBuffer = await generatedAudioBlob.arrayBuffer();
       
       // Criar AudioContext e decodificar
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -228,6 +237,28 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
           </>
         )}
       </Button>
+
+      {audioBlob && (
+        <Button
+          onClick={() => {
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'narracao-roteiro.mp3';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast.success('Áudio baixado!');
+          }}
+          variant="outline"
+          className="w-full"
+          size="sm"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Baixar Áudio
+        </Button>
+      )}
 
       <p className="text-xs text-muted-foreground">
         O áudio será automaticamente adicionado à timeline
