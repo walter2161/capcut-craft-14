@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Volume2, RefreshCw, Download } from 'lucide-react';
+import { Sparkles, Volume2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/store/editorStore';
 import { usePropertyStore } from '@/store/propertyStore';
@@ -12,7 +12,6 @@ export const ScriptPanel = () => {
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const { addMediaItem, addClip, clips, updateTotalDuration } = useEditorStore();
   const { propertyData } = usePropertyStore();
 
@@ -108,74 +107,147 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       return;
     }
 
-    // Verificar se Puter está disponível
-    if (!(window as any).puter) {
-      toast.error('Puter.js não está carregado');
+    if (!('speechSynthesis' in window)) {
+      toast.error('Seu navegador não suporta síntese de voz');
       return;
     }
 
     setIsConverting(true);
-    toast.info('Gerando áudio da narração com Puter.js...');
+    toast.info('Gerando áudio da narração... Aguarde até o fim.');
 
     try {
-      // Usar Puter.js para gerar áudio
-      const generatedAudioBlob = await (window as any).puter.ai.txt2speech(script);
+      // Aguardar as vozes carregarem
+      await new Promise<void>((resolve) => {
+        if (speechSynthesis.getVoices().length > 0) {
+          resolve();
+        } else {
+          speechSynthesis.onvoiceschanged = () => resolve();
+        }
+      });
+
+      // Criar AudioContext e MediaStreamDestination
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const destination = audioContext.createMediaStreamDestination();
       
-      // Verificar se o resultado é um Blob válido
-      if (!(generatedAudioBlob instanceof Blob)) {
-        throw new Error('Puter.js não retornou um Blob válido');
+      // Configurar síntese de voz
+      const utterance = new SpeechSynthesisUtterance(script);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.01; // Volume muito baixo para não reproduzir audível
+
+      // Usar voz em português
+      const voices = speechSynthesis.getVoices();
+      const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt'));
+      if (ptVoice) {
+        utterance.voice = ptVoice;
       }
 
-      // Armazenar o blob para download
-      setAudioBlob(generatedAudioBlob);
-      
-      // Converter blob para ArrayBuffer
-      const arrayBuffer = await generatedAudioBlob.arrayBuffer();
-      
-      // Criar AudioContext e decodificar
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      // Adicionar à biblioteca de mídia
-      const mediaId = `audio-script-${Date.now()}`;
-      addMediaItem({
-        id: mediaId,
-        type: 'audio',
-        name: 'Narração do Roteiro',
-        data: audioBuffer,
-        duration: audioBuffer.duration * 1000
+      // Criar um oscilador silencioso apenas para manter o stream ativo
+      const oscillator = audioContext.createOscillator();
+      oscillator.frequency.value = 0;
+      oscillator.connect(destination);
+      oscillator.start();
+
+      // MediaRecorder para capturar
+      const mediaRecorder = new MediaRecorder(destination.stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      const audioChunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      const processingPromise = new Promise<void>((resolve, reject) => {
+        mediaRecorder.onstop = async () => {
+          try {
+            oscillator.stop();
+            
+            if (audioChunks.length === 0) {
+              throw new Error('Nenhum áudio foi capturado');
+            }
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Adicionar à biblioteca de mídia
+            const mediaId = `audio-script-${Date.now()}`;
+            addMediaItem({
+              id: mediaId,
+              type: 'audio',
+              name: 'Narração do Roteiro',
+              data: audioBuffer,
+              duration: audioBuffer.duration * 1000
+            });
+
+            // Adicionar à timeline
+            const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
+            const lastPosition = audioClips.reduce((max, clip) => 
+              Math.max(max, clip.start + clip.duration), 0
+            );
+
+            addClip({
+              id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+              type: 'audio',
+              mediaId,
+              track: 'A1',
+              start: lastPosition,
+              duration: audioBuffer.duration * 1000,
+              scale: 1,
+              brightness: 0,
+              contrast: 0,
+              volume: 1,
+              speed: 1,
+              opacity: 1,
+              transition: 'none',
+              transitionDuration: 0
+            });
+
+            updateTotalDuration();
+            await audioContext.close();
+            toast.success('Áudio adicionado à timeline!');
+            resolve();
+          } catch (err) {
+            console.error('Erro ao processar áudio:', err);
+            reject(err);
+          }
+        };
       });
 
-      // Adicionar à timeline
-      const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
-      const lastPosition = audioClips.reduce((max, clip) => 
-        Math.max(max, clip.start + clip.duration), 0
-      );
+      // Iniciar gravação
+      mediaRecorder.start();
 
-      addClip({
-        id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-        type: 'audio',
-        mediaId,
-        track: 'A1',
-        start: lastPosition,
-        duration: audioBuffer.duration * 1000,
-        scale: 1,
-        brightness: 0,
-        contrast: 0,
-        volume: 1,
-        speed: 1,
-        opacity: 1,
-        transition: 'none',
-        transitionDuration: 0
+      // Criar promise para o utterance
+      const speechPromise = new Promise<void>((resolve, reject) => {
+        utterance.onend = () => {
+          setTimeout(() => {
+            mediaRecorder.stop();
+            resolve();
+          }, 1000);
+        };
+
+        utterance.onerror = (event) => {
+          console.error('Erro na síntese:', event);
+          mediaRecorder.stop();
+          reject(new Error('Erro ao sintetizar voz'));
+        };
       });
 
-      updateTotalDuration();
-      await audioContext.close();
-      toast.success('Áudio adicionado à timeline!');
+      // Falar o texto
+      speechSynthesis.speak(utterance);
+
+      // Aguardar processamento completo
+      await speechPromise;
+      await processingPromise;
 
     } catch (error) {
       console.error('Erro ao converter áudio:', error);
-      toast.error('Erro ao gerar áudio com Puter.js');
+      toast.error('Erro ao gerar áudio. Verifique as permissões do navegador.');
     } finally {
       setIsConverting(false);
     }
@@ -237,28 +309,6 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
           </>
         )}
       </Button>
-
-      {audioBlob && (
-        <Button
-          onClick={() => {
-            const url = URL.createObjectURL(audioBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'narracao-roteiro.mp3';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success('Áudio baixado!');
-          }}
-          variant="outline"
-          className="w-full"
-          size="sm"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Baixar Áudio
-        </Button>
-      )}
 
       <p className="text-xs text-muted-foreground">
         O áudio será automaticamente adicionado à timeline
