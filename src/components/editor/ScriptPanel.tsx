@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Volume2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/store/editorStore';
+import { usePropertyStore } from '@/store/propertyStore';
 
 const MISTRAL_API_KEY = 'aynCSftAcQBOlxmtmpJqVzco8K4aaTDQ';
 
@@ -12,26 +13,39 @@ export const ScriptPanel = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const { addMediaItem, addClip, clips, updateTotalDuration } = useEditorStore();
+  const { propertyData } = usePropertyStore();
 
   const generateScript = async () => {
+    if (!propertyData) {
+      toast.error('Escaneie um imóvel primeiro na página inicial');
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
-      const prompt = `Crie um roteiro profissional para narração de vídeo sobre imóveis para redes sociais (TikTok/Instagram Reels).
+      const prompt = `Crie um roteiro profissional para narração de vídeo sobre este imóvel para redes sociais (TikTok/Instagram Reels):
+
+Tipo: ${propertyData.tipo}
+Transação: ${propertyData.transacao}
+Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
+Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
+Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
+${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
+Diferenciais: ${propertyData.diferenciais.join(', ') || 'Imóvel de qualidade'}
 
 O roteiro deve ter:
 - INÍCIO: Gancho forte e impactante (2-3 frases que prendem atenção)
 - MEIO: Desenvolvimento com detalhes principais do imóvel e localização (3-4 frases)
 - FIM: Call-to-action claro e urgente (1-2 frases)
 
-Características:
+Características do roteiro:
 - Linguagem clara, natural e conversacional
 - Tom entusiasmado mas profissional
 - Entre 60-80 palavras (para 30-40 segundos de narração)
 - Sem emojis ou hashtags (apenas texto para narração)
 - Frases curtas e diretas
-
-Exemplo de tema: Apartamento moderno, 3 quartos, 2 vagas, ótima localização.`;
+- Use os dados reais do imóvel fornecidos acima`;
 
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -62,9 +76,22 @@ Exemplo de tema: Apartamento moderno, 3 quartos, 2 vagas, ótima localização.`
       toast.success('Roteiro gerado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar roteiro:', error);
-      const fallback = `Você está procurando o imóvel perfeito? Então presta atenção!
+      
+      if (!propertyData) {
+        toast.error('Dados do imóvel não disponíveis');
+        setIsGenerating(false);
+        return;
+      }
 
-Este apartamento incrível tem tudo que você precisa. Amplo, bem localizado e com acabamento moderno. Cozinha planejada, suíte master e varanda gourmet.
+      const tipo = propertyData.tipo || 'Imóvel';
+      const cidade = propertyData.cidade || '';
+      const bairro = propertyData.bairro || '';
+      const quartos = propertyData.quartos || 0;
+      const valor = propertyData.valor ? `R$ ${propertyData.valor.toLocaleString('pt-BR')}` : '';
+      
+      const fallback = `Você está procurando o ${tipo.toLowerCase()} perfeito em ${bairro}? Então presta atenção!
+
+Este ${tipo.toLowerCase()} incrível tem ${quartos} quartos e está localizado em ${cidade}. Amplo, bem localizado e com acabamento de qualidade. ${valor ? `Por apenas ${valor}.` : ''}
 
 Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. Esse imóvel não vai ficar disponível por muito tempo!`;
       setScript(fallback);
@@ -80,116 +107,67 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       return;
     }
 
-    if (!('speechSynthesis' in window)) {
-      toast.error('Seu navegador não suporta síntese de voz');
-      return;
-    }
-
     setIsConverting(true);
-    toast.info('Convertendo roteiro em áudio...');
+    toast.info('Gerando áudio da narração...');
 
     try {
-      // Criar contexto de áudio para gravar
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const destination = audioContext.createMediaStreamDestination();
+      // Usar API do Google TTS (gratuita, sem necessidade de key)
+      const text = encodeURIComponent(script);
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-BR&client=tw-ob&q=${text}`;
       
-      // Configurar síntese de voz
-      const utterance = new SpeechSynthesisUtterance(script);
-      utterance.lang = 'pt-BR';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      // Tentar usar uma voz em português
-      const voices = speechSynthesis.getVoices();
-      const ptVoice = voices.find(v => v.lang.startsWith('pt'));
-      if (ptVoice) {
-        utterance.voice = ptVoice;
+      // Fazer o download do áudio
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Erro ao gerar áudio');
       }
 
-      // MediaRecorder para capturar o áudio
-      const mediaRecorder = new MediaRecorder(destination.stream);
-      const audioChunks: Blob[] = [];
+      const audioBlob = await response.blob();
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      
+      // Decodificar o áudio
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      // Adicionar à biblioteca de mídia
+      const mediaId = `audio-script-${Date.now()}`;
+      addMediaItem({
+        id: mediaId,
+        type: 'audio',
+        name: 'Narração do Roteiro',
+        data: audioBuffer,
+        duration: audioBuffer.duration * 1000
+      });
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
+      // Adicionar automaticamente à timeline
+      const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
+      const lastPosition = audioClips.reduce((max, clip) => 
+        Math.max(max, clip.start + clip.duration), 0
+      );
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        
-        try {
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-          
-          // Adicionar à biblioteca de mídia
-          const mediaId = `audio-script-${Date.now()}`;
-          addMediaItem({
-            id: mediaId,
-            type: 'audio',
-            name: 'Narração do Roteiro',
-            data: audioBuffer,
-            duration: audioBuffer.duration * 1000
-          });
+      addClip({
+        id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+        type: 'audio',
+        mediaId,
+        track: 'A1',
+        start: lastPosition,
+        duration: audioBuffer.duration * 1000,
+        scale: 1,
+        brightness: 0,
+        contrast: 0,
+        volume: 1,
+        speed: 1,
+        opacity: 1,
+        transition: 'none',
+        transitionDuration: 0
+      });
 
-          // Adicionar automaticamente à timeline
-          const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
-          const lastPosition = audioClips.reduce((max, clip) => 
-            Math.max(max, clip.start + clip.duration), 0
-          );
-
-          addClip({
-            id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-            type: 'audio',
-            mediaId,
-            track: 'A1',
-            start: lastPosition,
-            duration: audioBuffer.duration * 1000,
-            scale: 1,
-            brightness: 0,
-            contrast: 0,
-            volume: 1,
-            speed: 1,
-            opacity: 1,
-            transition: 'none',
-            transitionDuration: 0
-          });
-
-          updateTotalDuration();
-          toast.success('Áudio adicionado à timeline!');
-          setIsConverting(false);
-        } catch (err) {
-          console.error('Erro ao processar áudio:', err);
-          toast.error('Erro ao processar áudio');
-          setIsConverting(false);
-        }
-      };
-
-      // Iniciar gravação
-      mediaRecorder.start();
-
-      utterance.onend = () => {
-        setTimeout(() => {
-          mediaRecorder.stop();
-          audioContext.close();
-        }, 500);
-      };
-
-      utterance.onerror = (event) => {
-        console.error('Erro na síntese de voz:', event);
-        mediaRecorder.stop();
-        audioContext.close();
-        toast.error('Erro ao gerar áudio');
-        setIsConverting(false);
-      };
-
-      speechSynthesis.speak(utterance);
-
+      updateTotalDuration();
+      toast.success('Áudio adicionado à timeline!');
+      audioContext.close();
     } catch (error) {
       console.error('Erro ao converter áudio:', error);
-      toast.error('Erro ao converter em áudio');
+      toast.error('Erro ao gerar áudio. Tente um roteiro mais curto.');
+    } finally {
       setIsConverting(false);
     }
   };
