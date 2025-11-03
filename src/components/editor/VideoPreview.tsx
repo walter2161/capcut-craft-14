@@ -85,7 +85,16 @@ export const VideoPreview = () => {
     }
 
     const mediaItem = mediaItems.find(m => m.id === currentAudioClip.mediaId);
-    if (!mediaItem || !mediaItem.data) return;
+    if (!mediaItem || !mediaItem.data) {
+      console.warn('Media item não encontrado ou sem dados de áudio');
+      return;
+    }
+
+    // Verificar se é um AudioBuffer válido
+    if (!(mediaItem.data instanceof AudioBuffer)) {
+      console.error('Dados da mídia não são um AudioBuffer:', mediaItem);
+      return;
+    }
 
     // Inicializar AudioContext se necessário
     if (!audioContextRef.current) {
@@ -94,16 +103,16 @@ export const VideoPreview = () => {
 
     const audioContext = audioContextRef.current;
     
-    // Se já está tocando o mesmo clipe, não reiniciar
-    if (audioSourceRef.current && audioSourceRef.current.buffer === mediaItem.data) {
-      return;
+    // Retomar o contexto se estiver suspenso
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
     }
 
     // Parar áudio anterior
     stopAudio();
 
     try {
-      // Criar novo source
+      // Criar novo source (SEMPRE criar novo, não pode reutilizar)
       const source = audioContext.createBufferSource();
       source.buffer = mediaItem.data;
       
@@ -122,11 +131,21 @@ export const VideoPreview = () => {
       // Aplicar velocidade
       source.playbackRate.value = currentAudioClip.speed;
       
+      // Calcular duração restante
+      const remainingDuration = Math.max(0, (currentAudioClip.duration / 1000) - timeInClip);
+      
       // Iniciar reprodução
-      source.start(0, offset);
+      source.start(0, offset, remainingDuration);
       
       audioSourceRef.current = source;
       gainNodeRef.current = gainNode;
+      
+      console.log('Áudio iniciado:', {
+        clipId: currentAudioClip.id,
+        offset,
+        duration: remainingDuration,
+        volume: currentAudioClip.volume
+      });
     } catch (error) {
       console.error('Erro ao reproduzir áudio:', error);
     }
