@@ -114,7 +114,7 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
     toast.info('Gerando áudio da narração...');
 
     try {
-      console.log('Iniciando conversão com ElevenLabs...');
+      console.log('Iniciando conversão de texto para áudio com Google TTS...');
       
       // Limpar o texto removendo qualquer marcação ou formatação
       const cleanText = script
@@ -125,32 +125,47 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       
       console.log('Texto limpo:', cleanText);
       
-      // Usar ElevenLabs API para TTS (gratuito)
+      // Usar Google Cloud Text-to-Speech API
       const response = await fetch(
-        'https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM',
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyCGNKs7LHU48mB2IHSKcLBM3NYxhKV67GQ`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'xi-api-key': 'sk_b89c8c5e9f8d4f5a9e8c5e9f8d4f5a9e'  // Key pública para testes
           },
           body: JSON.stringify({
-            text: cleanText,
-            model_id: 'eleven_multilingual_v2',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75
+            input: { text: cleanText },
+            voice: {
+              languageCode: 'pt-BR',
+              name: 'pt-BR-Standard-A',
+              ssmlGender: 'FEMALE'
+            },
+            audioConfig: {
+              audioEncoding: 'MP3',
+              pitch: 0,
+              speakingRate: 1.0
             }
           })
         }
       );
 
       if (!response.ok) {
-        console.error('Erro na ElevenLabs API:', response.status);
+        const errorData = await response.json();
+        console.error('Erro na API do Google:', errorData);
         throw new Error('Erro ao gerar áudio');
       }
 
-      const audioBlob = await response.blob();
+      const data = await response.json();
+      const audioContent = data.audioContent;
+      
+      // Converter base64 para Blob
+      const binaryString = atob(audioContent);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
+      
       console.log('Áudio gerado com sucesso:', audioBlob);
 
       // Criar AudioBuffer a partir do blob
