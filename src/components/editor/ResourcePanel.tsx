@@ -1,10 +1,11 @@
 import { useState, useRef } from "react";
-import { FolderOpen, Music, Upload, Image as ImageIcon, Video } from "lucide-react";
+import { FolderOpen, Music, Upload, Image as ImageIcon, Video, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
+import { ScriptPanel } from "./ScriptPanel";
 
-type TabType = 'media' | 'video' | 'audio';
+type TabType = 'media' | 'video' | 'audio' | 'script';
 
 export const ResourcePanel = () => {
   const [activeTab, setActiveTab] = useState<TabType>('media');
@@ -176,6 +177,17 @@ export const ResourcePanel = () => {
           title="Áudio"
         >
           <Music className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => setActiveTab('script')}
+          className={`flex-1 px-2 py-3 flex items-center justify-center transition-colors ${
+            activeTab === 'script' 
+              ? 'bg-background text-foreground border-b-2 border-primary' 
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          title="Roteiro"
+        >
+          <FileText className="w-4 h-4" />
         </button>
       </div>
 
@@ -353,6 +365,10 @@ export const ResourcePanel = () => {
               ))}
             </div>
           </>
+        )}
+
+        {activeTab === 'script' && (
+          <ScriptPanel />
         )}
       </div>
     </aside>
