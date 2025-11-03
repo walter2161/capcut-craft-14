@@ -61,16 +61,55 @@ export const PropertyScanner = () => {
       }
     });
 
-    // Extrair preço
-    const priceElements = doc.querySelectorAll('.price, .valor, .preco, [class*="price"], [class*="valor"]');
-    for (const priceEl of priceElements) {
+    // Extrair preço - buscar especificamente valor de venda e condomínio
+    const allPriceElements = doc.querySelectorAll('.price, .valor, .preco, [class*="price"], [class*="valor"], td, tr');
+    
+    let salePrice: number | undefined;
+    let condoPrice: number | undefined;
+    
+    for (const priceEl of allPriceElements) {
       const priceText = priceEl.textContent || '';
-      const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
-      if (priceMatch) {
-        data.valor = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
-        break;
+      const context = (priceEl.parentElement?.textContent || '') + ' ' + priceText;
+      const contextLower = context.toLowerCase();
+      
+      // Verificar se é valor de condomínio
+      if (contextLower.includes('condomínio') || contextLower.includes('condominio') || contextLower.includes('cond.')) {
+        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
+        if (priceMatch && !condoPrice) {
+          condoPrice = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+        }
+      }
+      // Verificar se é valor de venda/aluguel
+      else if (contextLower.includes('venda') || contextLower.includes('aluguel') || 
+               contextLower.includes('sale') || contextLower.includes('valor total') ||
+               priceEl.tagName === 'TD' && priceEl.classList.contains('Value')) {
+        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
+        if (priceMatch && !salePrice) {
+          const price = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+          // Valor de venda geralmente é maior que condomínio
+          if (price > 10000) {
+            salePrice = price;
+          }
+        }
       }
     }
+    
+    // Se não encontrou valor específico de venda, pegar o maior preço encontrado
+    if (!salePrice) {
+      for (const priceEl of allPriceElements) {
+        const priceText = priceEl.textContent || '';
+        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
+        if (priceMatch) {
+          const price = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+          if (!salePrice || price > salePrice) {
+            salePrice = price;
+          }
+        }
+      }
+    }
+    
+    data.valor = salePrice || 0;
+    data.condominio = condoPrice;
 
     // Extrair endereço/localização
     const locationElements = doc.querySelectorAll('.location, .endereco, .address, [class*="location"], [class*="endereco"]');
