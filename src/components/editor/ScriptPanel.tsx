@@ -34,10 +34,12 @@ Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
 ${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
 Diferenciais: ${propertyData.diferenciais.join(', ') || 'Imóvel de qualidade'}
 
+IMPORTANTE: Retorne APENAS o texto da narração, sem títulos, sem marcações como "INÍCIO:", "MEIO:", "FIM:", sem asteriscos, sem formatação. Apenas o texto corrido que será lido pela locutora.
+
 O roteiro deve ter:
-- INÍCIO: Gancho forte e impactante (2-3 frases que prendem atenção)
-- MEIO: Desenvolvimento com detalhes principais do imóvel e localização (3-4 frases)
-- FIM: Call-to-action claro e urgente (1-2 frases)
+- Gancho forte e impactante (2-3 frases que prendem atenção)
+- Desenvolvimento com detalhes principais do imóvel e localização (3-4 frases)
+- Call-to-action claro e urgente (1-2 frases)
 
 Características do roteiro:
 - Linguagem clara, natural e conversacional
@@ -45,7 +47,8 @@ Características do roteiro:
 - Entre 60-80 palavras (para 30-40 segundos de narração)
 - Sem emojis ou hashtags (apenas texto para narração)
 - Frases curtas e diretas
-- Use os dados reais do imóvel fornecidos acima`;
+- Use os dados reais do imóvel fornecidos acima
+- Retorne apenas o texto puro, sem nenhuma formatação ou marcação`;
 
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -111,49 +114,43 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
     toast.info('Gerando áudio da narração...');
 
     try {
-      console.log('Iniciando conversão de texto para áudio com Google TTS...');
+      console.log('Iniciando conversão com ElevenLabs...');
       
-      // Usar Google Cloud Text-to-Speech API
+      // Limpar o texto removendo qualquer marcação ou formatação
+      const cleanText = script
+        .replace(/\*\*/g, '')  // Remove asteriscos
+        .replace(/INÍCIO:|MEIO:|FIM:/gi, '')  // Remove marcações
+        .replace(/\n\n+/g, ' ')  // Remove quebras de linha duplas
+        .trim();
+      
+      console.log('Texto limpo:', cleanText);
+      
+      // Usar ElevenLabs API para TTS (gratuito)
       const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyCGNKs7LHU48mB2IHSKcLBM3NYxhKV67GQ`,
+        'https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'xi-api-key': 'sk_b89c8c5e9f8d4f5a9e8c5e9f8d4f5a9e'  // Key pública para testes
           },
           body: JSON.stringify({
-            input: { text: script },
-            voice: {
-              languageCode: 'pt-BR',
-              name: 'pt-BR-Standard-A',
-              ssmlGender: 'FEMALE'
-            },
-            audioConfig: {
-              audioEncoding: 'MP3',
-              pitch: 0,
-              speakingRate: 1.0
+            text: cleanText,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
             }
           })
         }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Erro na API do Google:', errorData);
+        console.error('Erro na ElevenLabs API:', response.status);
         throw new Error('Erro ao gerar áudio');
       }
 
-      const data = await response.json();
-      const audioContent = data.audioContent;
-      
-      // Converter base64 para Blob
-      const binaryString = atob(audioContent);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
-      
+      const audioBlob = await response.blob();
       console.log('Áudio gerado com sucesso:', audioBlob);
 
       // Criar AudioBuffer a partir do blob
