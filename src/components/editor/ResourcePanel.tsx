@@ -7,12 +7,10 @@ import { ScriptPanel } from "./ScriptPanel";
 
 type TabType = 'media' | 'video' | 'audio' | 'script';
 
-const FREE_SOUNDTRACKS = [
-  { id: 'free-1', name: 'Ambient Relax', url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_d1718ab41b.mp3', duration: 88000 },
-  { id: 'free-2', name: 'Upbeat Energy', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3', duration: 96000 },
-  { id: 'free-3', name: 'Acoustic Guitar', url: 'https://cdn.pixabay.com/download/audio/2022/08/04/audio_0625c1539c.mp3', duration: 74000 },
-  { id: 'free-4', name: 'Epic Cinematic', url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c610232532.mp3', duration: 118000 },
-  { id: 'free-5', name: 'Lofi Chill', url: 'https://cdn.pixabay.com/download/audio/2023/09/27/audio_ee9d90d81b.mp3', duration: 134000 },
+const LOCAL_SOUNDTRACKS = [
+  { id: 'local-1', name: 'Tech House Vibes', url: '/soundtracks/mixkit-tech-house-vibes-130.mp3', duration: 130000 },
+  { id: 'local-2', name: 'Hazy After Hours', url: '/soundtracks/mixkit-hazy-after-hours-132.mp3', duration: 132000 },
+  { id: 'local-3', name: 'Hip Hop', url: '/soundtracks/mixkit-hip-hop-02-738.mp3', duration: 120000 },
 ];
 
 export const ResourcePanel = () => {
@@ -187,7 +185,7 @@ export const ResourcePanel = () => {
     }
   };
 
-  const handleAddFreeTrackToTimeline = async (track: typeof FREE_SOUNDTRACKS[0]) => {
+  const handleAddLocalTrackToTimeline = async (track: typeof LOCAL_SOUNDTRACKS[0]) => {
     try {
       // Baixar e converter para AudioBuffer
       const response = await fetch(track.url);
@@ -491,10 +489,10 @@ export const ResourcePanel = () => {
             <div className="border-t border-border pt-4 mt-4">
               <h3 className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                 <Music className="w-3 h-3" />
-                Trilhas Gratuitas
+                Trilhas Sonoras
               </h3>
               <div className="space-y-2">
-                {FREE_SOUNDTRACKS.map((track) => (
+                {LOCAL_SOUNDTRACKS.map((track) => (
                   <div
                     key={track.id}
                     className="bg-muted/50 hover:bg-muted p-2 rounded transition-colors"
@@ -520,7 +518,7 @@ export const ResourcePanel = () => {
                       </div>
 
                       <Button
-                        onClick={() => handleAddFreeTrackToTimeline(track)}
+                        onClick={() => handleAddLocalTrackToTimeline(track)}
                         variant="ghost"
                         size="sm"
                         className="h-6 px-2 text-[10px]"
