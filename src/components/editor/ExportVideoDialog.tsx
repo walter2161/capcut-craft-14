@@ -549,49 +549,6 @@ export const ExportVideoDialog = () => {
         }
       }
 
-      // Gerar áudio para cada legenda (respeitando mute)
-      for (const subtitle of subtitleClips) {
-        const trackState = trackStates.find(t => t.name === subtitle.track);
-        if (trackState?.muted || !subtitle.text) continue; // Pular se estiver mutado ou sem texto
-        
-        try {
-          const utterance = new SpeechSynthesisUtterance(subtitle.text);
-          utterance.lang = 'pt-BR';
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-
-          // Usar Web Speech API para gerar o áudio
-          await new Promise<void>((resolve) => {
-            utterance.onend = () => resolve();
-            utterance.onerror = () => resolve();
-            window.speechSynthesis.speak(utterance);
-          });
-
-          // Calcular a duração estimada do áudio baseado no texto
-          const words = subtitle.text.split(/\s+/).length;
-          const estimatedDuration = (words / 150) * 60; // 150 palavras por minuto
-          const buffer = audioContext.createBuffer(
-            2, 
-            Math.ceil(estimatedDuration * audioContext.sampleRate),
-            audioContext.sampleRate
-          );
-
-          // Ajustar start time se thumbnail estiver habilitada
-          const adjustedStart = thumbnailData.enabled ? (subtitle.start / 1000) + 1 : subtitle.start / 1000;
-          audioBuffers.push({
-            start: adjustedStart,
-            buffer,
-            duration: estimatedDuration,
-            volume: subtitle.volume || 1.0,
-            speed: 1.0,
-            trimStart: 0
-          });
-        } catch (error) {
-          console.warn('Erro ao gerar áudio da legenda:', error);
-        }
-      }
-
       const videoStream = exportCanvas.captureStream(fps);
       
       // Debug: verificar trilhas de áudio

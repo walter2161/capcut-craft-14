@@ -2,9 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import { useEditorStore } from "@/store/editorStore";
 import { Button } from "@/components/ui/button";
 
-// Singleton para gerenciar a síntese de voz
-let currentUtterance: SpeechSynthesisUtterance | null = null;
-
 export const VideoPreview = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -15,7 +12,6 @@ export const VideoPreview = () => {
   const [, forceRerender] = useState(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
-  const lastSpokenSubtitleRef = useRef<string>('');
   const currentAudioClipRef = useRef<string | null>(null);
   const lastRenderTimeRef = useRef<number>(0);
 
@@ -83,7 +79,6 @@ export const VideoPreview = () => {
       handleSubtitles(currentTime);
     } else {
       stopAudio();
-      stopSpeech();
       currentAudioClipRef.current = null;
     }
   }, [currentTime, clips, mediaItems, isPlaying]);
@@ -187,47 +182,14 @@ export const VideoPreview = () => {
       c => c.start <= time && c.start + c.duration > time
     );
 
-    // Verificar se o track está mutado ou oculto
+    // Verificar se o track está oculto
     const trackState = trackStates.find(t => t.name === currentClip?.track);
-    const isMuted = trackState?.muted || false;
     const isHidden = trackState?.hidden || false;
 
     if (currentClip && currentClip.text && !isHidden) {
       setCurrentSubtitle(currentClip.text);
-      
-      // Reproduzir voz apenas se for uma nova legenda e não estiver mutado
-      if (lastSpokenSubtitleRef.current !== currentClip.text && !isMuted) {
-        speakText(currentClip.text);
-        lastSpokenSubtitleRef.current = currentClip.text;
-      }
     } else {
       setCurrentSubtitle('');
-      if (lastSpokenSubtitleRef.current) {
-        stopSpeech();
-        lastSpokenSubtitleRef.current = '';
-      }
-    }
-  };
-
-  const speakText = (text: string) => {
-    // Parar qualquer fala em andamento
-    if (currentUtterance) {
-      window.speechSynthesis.cancel();
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'pt-BR';
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    
-    currentUtterance = utterance;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const stopSpeech = () => {
-    if (currentUtterance) {
-      window.speechSynthesis.cancel();
-      currentUtterance = null;
     }
   };
 
@@ -555,7 +517,6 @@ export const VideoPreview = () => {
     imageCacheRef.current.clear();
     currentAudioClipRef.current = null;
     stopAudio();
-    stopSpeech();
     forceRerender(prev => prev + 1);
   };
 
