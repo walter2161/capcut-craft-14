@@ -52,14 +52,8 @@ export const ThumbnailEditor = () => {
 
   const canvasDimensions = getCanvasDimensions();
 
-  // Renderizar preview da thumbnail
-  useEffect(() => {
-    if (!isOpen || !canvasRef.current || !formData.enabled || activeTab !== 'preview') return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+  // Função para renderizar thumbnail
+  const renderThumbnail = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
     // Limpar canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000000';
@@ -96,27 +90,21 @@ export const ThumbnailEditor = () => {
     };
     
     img.onload = () => {
-      // Desenhar imagem de fundo (respeitando fit mode)
+      // Desenhar imagem de fundo
       const imgRatio = img.width / img.height;
-      
       let drawWidth, drawHeight, offsetX, offsetY;
       
-      // Fit-height: preenche a altura e centraliza horizontalmente
       if (globalSettings.mediaFitMode === 'fit-height') {
         drawHeight = canvas.height;
         drawWidth = imgRatio * drawHeight;
         offsetX = (canvas.width - drawWidth) / 2;
         offsetY = 0;
-      } 
-      // Fit-width: preenche a largura e centraliza verticalmente
-      else if (globalSettings.mediaFitMode === 'fit-width') {
+      } else if (globalSettings.mediaFitMode === 'fit-width') {
         drawWidth = canvas.width;
         drawHeight = drawWidth / imgRatio;
         offsetX = 0;
         offsetY = (canvas.height - drawHeight) / 2;
-      }
-      // Contain: imagem inteira visível
-      else {
+      } else {
         const canvasRatio = canvas.width / canvas.height;
         if (imgRatio > canvasRatio) {
           drawWidth = canvas.width;
@@ -134,40 +122,78 @@ export const ThumbnailEditor = () => {
       ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
       // Overlay escuro
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillStyle = `rgba(0, 0, 0, ${formData.overlayOpacity})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Card centralizado em área 1:1
       const squareSize = Math.min(canvas.width, canvas.height);
       const squareX = (canvas.width - squareSize) / 2;
       const squareY = (canvas.height - squareSize) / 2;
-      const cardPadding = squareSize * 0.1;
+      const cardPadding = squareSize * formData.cardPadding;
       const cardX = squareX + cardPadding;
       const cardY = squareY + cardPadding;
       const cardWidth = squareSize - (cardPadding * 2);
       const cardHeight = squareSize - (cardPadding * 2);
 
-      // Fundo do card com gradiente
-      const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      gradient.addColorStop(1, 'rgba(240, 240, 240, 0.95)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+      // Converter hex para rgba
+      const hexToRgba = (hex: string, opacity: number) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      };
+
+      // Fundo do card
+      ctx.fillStyle = hexToRgba(formData.cardBgColor, formData.cardBgOpacity);
+      
+      if (formData.borderRadius > 0) {
+        const radius = formData.borderRadius;
+        ctx.beginPath();
+        ctx.moveTo(cardX + radius, cardY);
+        ctx.lineTo(cardX + cardWidth - radius, cardY);
+        ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
+        ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
+        ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
+        ctx.lineTo(cardX + radius, cardY + cardHeight);
+        ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
+        ctx.lineTo(cardX, cardY + radius);
+        ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+      }
 
       // Borda do card
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+      if (formData.borderRadius > 0) {
+        const radius = formData.borderRadius;
+        ctx.beginPath();
+        ctx.moveTo(cardX + radius, cardY);
+        ctx.lineTo(cardX + cardWidth - radius, cardY);
+        ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
+        ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
+        ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
+        ctx.lineTo(cardX + radius, cardY + cardHeight);
+        ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
+        ctx.lineTo(cardX, cardY + radius);
+        ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
+        ctx.closePath();
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+      }
 
       // Renderizar textos
-      const fontSize = squareSize * 0.05;
-      const lineHeight = fontSize * 1.5;
+      const baseFontSize = squareSize * 0.05;
+      const lineHeight = baseFontSize * 1.5;
       let currentY = cardY + cardHeight * 0.15;
 
       // Título
       if (formData.title) {
-        ctx.fillStyle = '#1a1a1a';
-        ctx.font = `bold ${fontSize * 1.4}px Arial`;
+        ctx.fillStyle = formData.titleColor;
+        ctx.font = `bold ${baseFontSize * formData.titleFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(formData.title, cardX + cardWidth / 2, currentY);
         currentY += lineHeight * 2;
@@ -175,26 +201,26 @@ export const ThumbnailEditor = () => {
 
       // Preço
       if (formData.price) {
-        ctx.fillStyle = '#16a34a';
-        ctx.font = `bold ${fontSize * 1.8}px Arial`;
+        ctx.fillStyle = formData.priceColor;
+        ctx.font = `bold ${baseFontSize * formData.priceFontSize}px Arial`;
         ctx.fillText(formData.price, cardX + cardWidth / 2, currentY);
         currentY += lineHeight * 2.5;
       }
 
       // Características em grid
       const startY = currentY;
-      ctx.font = `${fontSize}px Arial`;
+      ctx.font = `${baseFontSize * formData.textFontSize}px Arial`;
 
       if (formData.bedrooms) {
         const x = cardX + cardWidth * 0.25;
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = formData.textColor;
         ctx.fillText('🛏️', x, startY);
         ctx.fillText(`${formData.bedrooms} quartos`, x, startY + lineHeight);
       }
 
       if (formData.bathrooms) {
         const x = cardX + cardWidth * 0.75;
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = formData.textColor;
         ctx.fillText('🚿', x, startY);
         ctx.fillText(`${formData.bathrooms} banheiros`, x, startY + lineHeight);
       }
@@ -202,15 +228,15 @@ export const ThumbnailEditor = () => {
       currentY += lineHeight * 3;
 
       if (formData.area) {
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = formData.textColor;
         ctx.fillText(`📐 ${formData.area} m²`, cardX + cardWidth / 2, currentY);
       }
 
       // Localização no rodapé
       if (formData.location) {
         currentY = cardY + cardHeight - cardHeight * 0.15;
-        ctx.fillStyle = '#666666';
-        ctx.font = `${fontSize * 0.9}px Arial`;
+        ctx.fillStyle = formData.locationColor;
+        ctx.font = `${baseFontSize * formData.textFontSize * 0.9}px Arial`;
         ctx.fillText(`📍 ${formData.location}`, cardX + cardWidth / 2, currentY);
       }
     };
@@ -229,15 +255,22 @@ export const ThumbnailEditor = () => {
     } else if (mediaItem.data instanceof Blob || mediaItem.data instanceof File) {
       const url = URL.createObjectURL(mediaItem.data);
       img.onload = () => {
-        if (img.onload) {
-          const handler = img.onload;
-          handler.call(img, new Event('load'));
-        }
         URL.revokeObjectURL(url);
       };
       img.src = url;
     }
-  }, [isOpen, activeTab, formData, clips, mediaItems, globalSettings]);
+  };
+
+  // Renderizar preview da thumbnail
+  useEffect(() => {
+    if (!isOpen || !canvasRef.current || !formData.enabled) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    renderThumbnail(ctx, canvas);
+  }, [isOpen, formData, clips, mediaItems, globalSettings]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -262,7 +295,7 @@ export const ThumbnailEditor = () => {
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+            <TabsTrigger value="preview">Preview ao Vivo</TabsTrigger>
             <TabsTrigger value="settings">Configurações</TabsTrigger>
           </TabsList>
           
@@ -279,14 +312,45 @@ export const ThumbnailEditor = () => {
             </div>
             
             {formData.enabled ? (
-              <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center">
-                <canvas
-                  ref={canvasRef}
-                  width={canvasDimensions.width}
-                  height={canvasDimensions.height}
-                  className="max-w-full h-auto"
-                  style={{ maxHeight: '60vh' }}
-                />
+              <div className="space-y-4">
+                <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                  <canvas
+                    ref={canvasRef}
+                    width={canvasDimensions.width}
+                    height={canvasDimensions.height}
+                    className="max-w-full h-auto"
+                    style={{ maxHeight: '60vh' }}
+                  />
+                </div>
+                
+                {/* Controles rápidos de visualização */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Opacidade Overlay: {(formData.overlayOpacity * 100).toFixed(0)}%</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={formData.overlayOpacity}
+                      onChange={(e) => setFormData({ ...formData, overlayOpacity: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Opacidade Card: {(formData.cardBgOpacity * 100).toFixed(0)}%</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={formData.cardBgOpacity}
+                      onChange={(e) => setFormData({ ...formData, cardBgOpacity: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
@@ -296,104 +360,270 @@ export const ThumbnailEditor = () => {
           </TabsContent>
           
           <TabsContent value="settings" className="space-y-4 py-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="enabled">Ativar Thumbnail</Label>
-            <Switch
-              id="enabled"
-              checked={formData.enabled}
-              onCheckedChange={(checked) => 
-                setFormData({ ...formData, enabled: checked })
-              }
-            />
-          </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="enabled">Ativar Thumbnail</Label>
+              <Switch
+                id="enabled"
+                checked={formData.enabled}
+                onCheckedChange={(checked) => 
+                  setFormData({ ...formData, enabled: checked })
+                }
+              />
+            </div>
 
-          {formData.enabled && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="title">Título do Imóvel</Label>
-                <Input
-                  id="title"
-                  placeholder="Ex: Casa Moderna no Centro"
-                  value={formData.title}
-                  onChange={(e) => 
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                />
-              </div>
+            {formData.enabled && (
+              <>
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold">Informações do Imóvel</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Título do Imóvel</Label>
+                    <Input
+                      id="title"
+                      placeholder="Ex: Casa Moderna no Centro"
+                      value={formData.title}
+                      onChange={(e) => 
+                        setFormData({ ...formData, title: e.target.value })
+                      }
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="price">Preço</Label>
-                <Input
-                  id="price"
-                  placeholder="Ex: R$ 850.000"
-                  value={formData.price}
-                  onChange={(e) => 
-                    setFormData({ ...formData, price: e.target.value })
-                  }
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Preço</Label>
+                    <Input
+                      id="price"
+                      placeholder="Ex: R$ 850.000"
+                      value={formData.price}
+                      onChange={(e) => 
+                        setFormData({ ...formData, price: e.target.value })
+                      }
+                    />
+                  </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-2">
-                  <Label htmlFor="bedrooms">Quartos</Label>
-                  <Input
-                    id="bedrooms"
-                    placeholder="3"
-                    value={formData.bedrooms}
-                    onChange={(e) => 
-                      setFormData({ ...formData, bedrooms: e.target.value })
-                    }
-                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="bedrooms">Quartos</Label>
+                      <Input
+                        id="bedrooms"
+                        placeholder="3"
+                        value={formData.bedrooms}
+                        onChange={(e) => 
+                          setFormData({ ...formData, bedrooms: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bathrooms">Banheiros</Label>
+                      <Input
+                        id="bathrooms"
+                        placeholder="2"
+                        value={formData.bathrooms}
+                        onChange={(e) => 
+                          setFormData({ ...formData, bathrooms: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="area">Área (m²)</Label>
+                      <Input
+                        id="area"
+                        placeholder="120"
+                        value={formData.area}
+                        onChange={(e) => 
+                          setFormData({ ...formData, area: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Localização</Label>
+                    <Input
+                      id="location"
+                      placeholder="Ex: Centro, São Paulo - SP"
+                      value={formData.location}
+                      onChange={(e) => 
+                        setFormData({ ...formData, location: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="bathrooms">Banheiros</Label>
-                  <Input
-                    id="bathrooms"
-                    placeholder="2"
-                    value={formData.bathrooms}
-                    onChange={(e) => 
-                      setFormData({ ...formData, bathrooms: e.target.value })
-                    }
-                  />
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold">Cores</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cardBg">Fundo do Card</Label>
+                      <Input
+                        id="cardBg"
+                        type="color"
+                        value={formData.cardBgColor}
+                        onChange={(e) => 
+                          setFormData({ ...formData, cardBgColor: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="titleColor">Cor do Título</Label>
+                      <Input
+                        id="titleColor"
+                        type="color"
+                        value={formData.titleColor}
+                        onChange={(e) => 
+                          setFormData({ ...formData, titleColor: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="priceColor">Cor do Preço</Label>
+                      <Input
+                        id="priceColor"
+                        type="color"
+                        value={formData.priceColor}
+                        onChange={(e) => 
+                          setFormData({ ...formData, priceColor: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="textColor">Cor do Texto</Label>
+                      <Input
+                        id="textColor"
+                        type="color"
+                        value={formData.textColor}
+                        onChange={(e) => 
+                          setFormData({ ...formData, textColor: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="locationColor">Cor Localização</Label>
+                      <Input
+                        id="locationColor"
+                        type="color"
+                        value={formData.locationColor}
+                        onChange={(e) => 
+                          setFormData({ ...formData, locationColor: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="area">Área (m²)</Label>
-                  <Input
-                    id="area"
-                    placeholder="120"
-                    value={formData.area}
-                    onChange={(e) => 
-                      setFormData({ ...formData, area: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold">Tamanhos de Fonte</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Título: {formData.titleFontSize.toFixed(1)}x</Label>
+                      <input
+                        type="range"
+                        min="0.8"
+                        max="2.5"
+                        step="0.1"
+                        value={formData.titleFontSize}
+                        onChange={(e) => setFormData({ ...formData, titleFontSize: parseFloat(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="location">Localização</Label>
-                <Input
-                  id="location"
-                  placeholder="Ex: Centro, São Paulo - SP"
-                  value={formData.location}
-                  onChange={(e) => 
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                />
-              </div>
-            </>
-          )}
+                    <div className="space-y-2">
+                      <Label>Preço: {formData.priceFontSize.toFixed(1)}x</Label>
+                      <input
+                        type="range"
+                        min="0.8"
+                        max="2.5"
+                        step="0.1"
+                        value={formData.priceFontSize}
+                        onChange={(e) => setFormData({ ...formData, priceFontSize: parseFloat(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Texto: {formData.textFontSize.toFixed(1)}x</Label>
+                      <input
+                        type="range"
+                        min="0.6"
+                        max="1.8"
+                        step="0.1"
+                        value={formData.textFontSize}
+                        onChange={(e) => setFormData({ ...formData, textFontSize: parseFloat(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold">Estilo</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Arredondamento: {formData.borderRadius}px</Label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        step="5"
+                        value={formData.borderRadius}
+                        onChange={(e) => setFormData({ ...formData, borderRadius: parseInt(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Espaçamento Card: {(formData.cardPadding * 100).toFixed(0)}%</Label>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="0.2"
+                        step="0.01"
+                        value={formData.cardPadding}
+                        onChange={(e) => setFormData({ ...formData, cardPadding: parseFloat(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Cancelar
+        <div className="flex justify-between gap-2 pt-4 border-t">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const canvas = canvasRef.current;
+              if (!canvas) return;
+              
+              const link = document.createElement('a');
+              link.download = 'thumbnail.png';
+              link.href = canvas.toDataURL();
+              link.click();
+              toast.success("Thumbnail baixada com sucesso!");
+            }}
+            disabled={!formData.enabled}
+          >
+            Baixar Thumb
           </Button>
-          <Button onClick={handleSave}>
-            Salvar
-          </Button>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave}>
+              Salvar Configurações
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

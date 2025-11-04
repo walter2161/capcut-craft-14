@@ -44,6 +44,19 @@ export interface ThumbnailData {
   bathrooms: string;
   area: string;
   location: string;
+  // Configurações visuais
+  cardBgColor: string;
+  cardBgOpacity: number;
+  overlayOpacity: number;
+  titleColor: string;
+  priceColor: string;
+  textColor: string;
+  locationColor: string;
+  titleFontSize: number;
+  priceFontSize: number;
+  textFontSize: number;
+  borderRadius: number;
+  cardPadding: number;
 }
 
 export interface GlobalSettings {
@@ -119,6 +132,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     bathrooms: '',
     area: '',
     location: '',
+    // Valores padrão para configurações visuais
+    cardBgColor: '#ffffff',
+    cardBgOpacity: 0.95,
+    overlayOpacity: 0.6,
+    titleColor: '#1a1a1a',
+    priceColor: '#16a34a',
+    textColor: '#1a1a1a',
+    locationColor: '#666666',
+    titleFontSize: 1.4,
+    priceFontSize: 1.8,
+    textFontSize: 1.0,
+    borderRadius: 0,
+    cardPadding: 0.1,
   },
 
   addMediaItem: (item) => set((state) => ({ 

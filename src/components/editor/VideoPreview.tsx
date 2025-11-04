@@ -291,43 +291,70 @@ export const VideoPreview = () => {
     const imgProps = fitImageToCanvas(media, canvas);
     ctx.drawImage(media, imgProps.offsetX, imgProps.offsetY, imgProps.drawWidth, imgProps.drawHeight);
 
+    // Overlay semi-transparente (usando configuração)
+    ctx.fillStyle = `rgba(0, 0, 0, ${thumbnailData.overlayOpacity})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     // Calcular área 1:1 centralizada
     const squareSize = Math.min(canvas.width, canvas.height);
     const squareX = (canvas.width - squareSize) / 2;
     const squareY = (canvas.height - squareSize) / 2;
 
-    // Overlay semi-transparente
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     // Card centralizado
-    const cardPadding = squareSize * 0.1;
+    const cardPadding = squareSize * thumbnailData.cardPadding;
     const cardX = squareX + cardPadding;
     const cardY = squareY + cardPadding;
     const cardWidth = squareSize - (cardPadding * 2);
     const cardHeight = squareSize - (cardPadding * 2);
 
-    // Fundo do card com gradiente
-    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-    gradient.addColorStop(1, 'rgba(240, 240, 240, 0.95)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+    // Converter hex para rgba
+    const hexToRgba = (hex: string, opacity: number) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    };
 
-    // Borda do card
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+    // Fundo do card (usando configuração)
+    ctx.fillStyle = hexToRgba(thumbnailData.cardBgColor, thumbnailData.cardBgOpacity);
+    
+    if (thumbnailData.borderRadius > 0) {
+      const radius = thumbnailData.borderRadius;
+      ctx.beginPath();
+      ctx.moveTo(cardX + radius, cardY);
+      ctx.lineTo(cardX + cardWidth - radius, cardY);
+      ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
+      ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
+      ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
+      ctx.lineTo(cardX + radius, cardY + cardHeight);
+      ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
+      ctx.lineTo(cardX, cardY + radius);
+      ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Borda
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+      
+      // Borda do card
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+    }
 
     // Renderizar conteúdo
-    const fontSize = squareSize * 0.05;
-    const lineHeight = fontSize * 1.5;
+    const baseFontSize = squareSize * 0.05;
+    const lineHeight = baseFontSize * 1.5;
     let currentY = cardY + cardHeight * 0.15;
 
     // Título
     if (thumbnailData.title) {
-      ctx.fillStyle = '#1a1a1a';
-      ctx.font = `bold ${fontSize * 1.4}px Inter, sans-serif`;
+      ctx.fillStyle = thumbnailData.titleColor;
+      ctx.font = `bold ${baseFontSize * thumbnailData.titleFontSize}px Inter, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(thumbnailData.title, cardX + cardWidth / 2, currentY);
       currentY += lineHeight * 2;
@@ -335,31 +362,29 @@ export const VideoPreview = () => {
 
     // Preço
     if (thumbnailData.price) {
-      ctx.fillStyle = '#16a34a';
-      ctx.font = `bold ${fontSize * 1.8}px Inter, sans-serif`;
+      ctx.fillStyle = thumbnailData.priceColor;
+      ctx.font = `bold ${baseFontSize * thumbnailData.priceFontSize}px Inter, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(thumbnailData.price, cardX + cardWidth / 2, currentY);
       currentY += lineHeight * 2.5;
     }
 
     // Características em grid
-    const iconSize = fontSize * 0.9;
     const startY = currentY;
-    const itemSpacing = cardWidth * 0.25;
 
-    ctx.font = `${fontSize}px Inter, sans-serif`;
+    ctx.font = `${baseFontSize * thumbnailData.textFontSize}px Inter, Arial, sans-serif`;
     ctx.textAlign = 'center';
 
     if (thumbnailData.bedrooms) {
       const x = cardX + cardWidth * 0.25;
-      ctx.fillStyle = '#1a1a1a';
+      ctx.fillStyle = thumbnailData.textColor;
       ctx.fillText('🛏️', x, startY);
       ctx.fillText(`${thumbnailData.bedrooms} quartos`, x, startY + lineHeight);
     }
 
     if (thumbnailData.bathrooms) {
       const x = cardX + cardWidth * 0.75;
-      ctx.fillStyle = '#1a1a1a';
+      ctx.fillStyle = thumbnailData.textColor;
       ctx.fillText('🚿', x, startY);
       ctx.fillText(`${thumbnailData.bathrooms} banheiros`, x, startY + lineHeight);
     }
@@ -367,7 +392,7 @@ export const VideoPreview = () => {
     currentY += lineHeight * 3;
 
     if (thumbnailData.area) {
-      ctx.fillStyle = '#1a1a1a';
+      ctx.fillStyle = thumbnailData.textColor;
       ctx.fillText(`📐 ${thumbnailData.area} m²`, cardX + cardWidth / 2, currentY);
       currentY += lineHeight * 1.5;
     }
@@ -375,8 +400,8 @@ export const VideoPreview = () => {
     // Localização
     if (thumbnailData.location) {
       currentY = cardY + cardHeight - cardHeight * 0.15;
-      ctx.fillStyle = '#666666';
-      ctx.font = `${fontSize * 0.9}px Inter, sans-serif`;
+      ctx.fillStyle = thumbnailData.locationColor;
+      ctx.font = `${baseFontSize * thumbnailData.textFontSize * 0.9}px Inter, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(`📍 ${thumbnailData.location}`, cardX + cardWidth / 2, currentY);
     }
