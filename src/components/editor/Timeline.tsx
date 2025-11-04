@@ -338,121 +338,123 @@ export const Timeline = () => {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="overflow-x-auto relative tracks-container">
-          {tracks.map((trackName, idx) => {
-          const trackClips = clips.filter(c => c.track === trackName);
-          const isVideoTrack = trackName.startsWith('V');
-          const isSubtitleTrack = trackName.startsWith('SUB');
-          
-          return (
-            <div 
-              key={trackName}
-              className="h-14 flex bg-[hsl(var(--editor-panel))] mb-1 relative"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => handleTrackDrop(e, trackName)}
-            >
-              <div className="w-20 min-w-20 flex items-center justify-center font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
-                {trackName}
-              </div>
-              <div className="flex-1 relative" style={{ minWidth: `${Math.max(1200, totalDuration / MS_PER_PIXEL + 100)}px` }}>
-                {trackClips.map(clip => {
-                  const mediaItem = mediaItems.find(m => m.id === clip.mediaId);
-                  return (
-                    <div
-                      key={clip.id}
-                      draggable
-                      onDragStart={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        dragOffsetRef.current = e.clientX - rect.left;
-                        e.dataTransfer.setData('clipId', clip.id);
-                        draggedClipRef.current = clip.id;
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onDragEnd={() => {
-                        draggedClipRef.current = null;
-                        dragOffsetRef.current = 0;
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectClip(clip.id, e.shiftKey);
-                      }}
-                      className={`absolute h-10 top-2 rounded transition-all overflow-hidden cursor-move group ${
-                        selectedClipIds.includes(clip.id)
-                          ? isVideoTrack 
-                            ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary'
-                            : isSubtitleTrack
-                              ? 'bg-purple-600/90 border-2 border-primary'
-                              : 'bg-[hsl(var(--clip-audio))]/90 border-2 border-primary'
-                          : isVideoTrack
-                            ? 'bg-[hsl(var(--clip-video))] border-2 border-transparent hover:opacity-80'
-                            : isSubtitleTrack
-                              ? 'bg-purple-600 border-2 border-transparent hover:opacity-80'
-                              : 'bg-[hsl(var(--clip-audio))] border-2 border-transparent hover:opacity-80'
-                      }`}
-                      style={{
-                        left: `${clip.start / MS_PER_PIXEL}px`,
-                        width: `${clip.duration / MS_PER_PIXEL}px`,
-                      }}
-                    >
-                      {mediaItem?.thumbnail && (
-                        <img 
-                          src={mediaItem.thumbnail} 
-                          alt={mediaItem.name}
-                          className="absolute inset-0 w-full h-full object-cover opacity-30"
-                        />
-                      )}
-                      <div className="px-2 text-xs text-white truncate leading-10 relative z-10 flex items-center justify-between">
-                        <span className="truncate flex-1">{clip.text || mediaItem?.name || 'Clip'}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            removeClip(clip.id);
-                            updateTotalDuration();
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 hover:text-red-500 hover:scale-125 text-lg font-bold"
-                          title="Deletar clip"
-                        >
-                          ×
-                        </button>
+      <div className="flex-1 relative overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="overflow-x-auto relative tracks-container">
+            {tracks.map((trackName, idx) => {
+            const trackClips = clips.filter(c => c.track === trackName);
+            const isVideoTrack = trackName.startsWith('V');
+            const isSubtitleTrack = trackName.startsWith('SUB');
+            
+            return (
+              <div 
+                key={trackName}
+                className="h-14 flex bg-[hsl(var(--editor-panel))] mb-1 relative"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleTrackDrop(e, trackName)}
+              >
+                <div className="w-20 min-w-20 flex items-center justify-center font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
+                  {trackName}
+                </div>
+                <div className="flex-1 relative" style={{ minWidth: `${Math.max(1200, totalDuration / MS_PER_PIXEL + 100)}px` }}>
+                  {trackClips.map(clip => {
+                    const mediaItem = mediaItems.find(m => m.id === clip.mediaId);
+                    return (
+                      <div
+                        key={clip.id}
+                        draggable
+                        onDragStart={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          dragOffsetRef.current = e.clientX - rect.left;
+                          e.dataTransfer.setData('clipId', clip.id);
+                          draggedClipRef.current = clip.id;
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={() => {
+                          draggedClipRef.current = null;
+                          dragOffsetRef.current = 0;
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectClip(clip.id, e.shiftKey);
+                        }}
+                        className={`absolute h-10 top-2 rounded transition-all overflow-hidden cursor-move group ${
+                          selectedClipIds.includes(clip.id)
+                            ? isVideoTrack 
+                              ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary'
+                              : isSubtitleTrack
+                                ? 'bg-purple-600/90 border-2 border-primary'
+                                : 'bg-[hsl(var(--clip-audio))]/90 border-2 border-primary'
+                            : isVideoTrack
+                              ? 'bg-[hsl(var(--clip-video))] border-2 border-transparent hover:opacity-80'
+                              : isSubtitleTrack
+                                ? 'bg-purple-600 border-2 border-transparent hover:opacity-80'
+                                : 'bg-[hsl(var(--clip-audio))] border-2 border-transparent hover:opacity-80'
+                        }`}
+                        style={{
+                          left: `${clip.start / MS_PER_PIXEL}px`,
+                          width: `${clip.duration / MS_PER_PIXEL}px`,
+                        }}
+                      >
+                        {mediaItem?.thumbnail && (
+                          <img 
+                            src={mediaItem.thumbnail} 
+                            alt={mediaItem.name}
+                            className="absolute inset-0 w-full h-full object-cover opacity-30"
+                          />
+                        )}
+                        <div className="px-2 text-xs text-white truncate leading-10 relative z-10 flex items-center justify-between">
+                          <span className="truncate flex-1">{clip.text || mediaItem?.name || 'Clip'}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              removeClip(clip.id);
+                              updateTotalDuration();
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 hover:text-red-500 hover:scale-125 text-lg font-bold"
+                            title="Deletar clip"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
-        
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const nextVideoNum = tracks.filter(t => t.startsWith('V')).length + 1;
-              const nextAudioNum = tracks.filter(t => t.startsWith('A')).length + 1;
-              setTracks([...tracks, `V${nextVideoNum}`, `A${nextAudioNum}`]);
-            }}
-            className="ml-20 my-2 text-xs"
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            Adicionar Track
-          </Button>
-
-          {/* Playhead */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-10 cursor-col-resize pointer-events-none"
-            style={{
-              left: `${80 + currentTime / MS_PER_PIXEL}px`,
-            }}
-          >
-            <div 
-              className="w-3 h-3 bg-[hsl(var(--playhead))] rounded-full -ml-1.5 -mt-1 cursor-grab active:cursor-grabbing pointer-events-auto"
-              onMouseDown={handlePlayheadMouseDown}
-            />
+            );
+          })}
+          
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const nextVideoNum = tracks.filter(t => t.startsWith('V')).length + 1;
+                const nextAudioNum = tracks.filter(t => t.startsWith('A')).length + 1;
+                setTracks([...tracks, `V${nextVideoNum}`, `A${nextAudioNum}`]);
+              }}
+              className="ml-20 my-2 text-xs"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Adicionar Track
+            </Button>
           </div>
+        </ScrollArea>
+
+        {/* Playhead - Fixo fora do ScrollArea */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-20 cursor-col-resize pointer-events-none"
+          style={{
+            left: `${80 + currentTime / MS_PER_PIXEL}px`,
+          }}
+        >
+          <div 
+            className="w-3 h-3 bg-[hsl(var(--playhead))] rounded-full -ml-1.5 -mt-1 cursor-grab active:cursor-grabbing pointer-events-auto"
+            onMouseDown={handlePlayheadMouseDown}
+          />
         </div>
-      </ScrollArea>
+      </div>
     </footer>
   );
 };
