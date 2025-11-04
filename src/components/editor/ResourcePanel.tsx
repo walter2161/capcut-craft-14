@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FolderOpen, Music, Upload, Image as ImageIcon, Video, FileText, Play, Pause, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/store/editorStore";
@@ -8,21 +8,29 @@ import { ScriptPanel } from "./ScriptPanel";
 type TabType = 'media' | 'video' | 'audio' | 'script';
 
 const FREE_SOUNDTRACKS = [
-  { id: 'free-1', name: 'Ambient Relax', url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_d1718ab41b.mp3', duration: 88000 },
-  { id: 'free-2', name: 'Upbeat Energy', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', duration: 96000 },
-  { id: 'free-3', name: 'Acoustic Guitar', url: 'https://cdn.pixabay.com/audio/2022/08/04/audio_0625c1539c.mp3', duration: 74000 },
-  { id: 'free-4', name: 'Epic Cinematic', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_c610232532.mp3', duration: 118000 },
-  { id: 'free-5', name: 'Lofi Chill', url: 'https://cdn.pixabay.com/audio/2023/09/27/audio_ee9d90d81b.mp3', duration: 134000 },
+  { id: 'free-1', name: 'Ambient Relax', url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_d1718ab41b.mp3', duration: 88000 },
+  { id: 'free-2', name: 'Upbeat Energy', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3', duration: 96000 },
+  { id: 'free-3', name: 'Acoustic Guitar', url: 'https://cdn.pixabay.com/download/audio/2022/08/04/audio_0625c1539c.mp3', duration: 74000 },
+  { id: 'free-4', name: 'Epic Cinematic', url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c610232532.mp3', duration: 118000 },
+  { id: 'free-5', name: 'Lofi Chill', url: 'https://cdn.pixabay.com/download/audio/2023/09/27/audio_ee9d90d81b.mp3', duration: 134000 },
 ];
 
 export const ResourcePanel = () => {
   const [activeTab, setActiveTab] = useState<TabType>('media');
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
-  const { mediaItems, addMediaItem, removeMediaItem, addClip } = useEditorStore();
+  const { mediaItems, addMediaItem, removeMediaItem, addClip, isPlaying } = useEditorStore();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+
+  // Pausar preview player quando o preview principal é pausado
+  useEffect(() => {
+    if (!isPlaying && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      setPlayingTrackId(null);
+    }
+  }, [isPlaying]);
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'audio') => {
     const files = Array.from(e.target.files || []);
@@ -157,7 +165,7 @@ export const ResourcePanel = () => {
     e.dataTransfer.effectAllowed = 'copy';
   };
 
-  const handlePlayPauseTrack = (trackId: string, url: string) => {
+  const handlePlayPauseTrack = async (trackId: string, url: string) => {
     const audio = audioPlayerRef.current;
     if (!audio) return;
 
@@ -165,9 +173,17 @@ export const ResourcePanel = () => {
       audio.pause();
       setPlayingTrackId(null);
     } else {
-      audio.src = url;
-      audio.play();
-      setPlayingTrackId(trackId);
+      try {
+        audio.src = url;
+        audio.crossOrigin = 'anonymous';
+        audio.load();
+        await audio.play();
+        setPlayingTrackId(trackId);
+      } catch (error) {
+        console.error('Erro ao reproduzir trilha:', error);
+        toast.error('Erro ao reproduzir trilha sonora');
+        setPlayingTrackId(null);
+      }
     }
   };
 
