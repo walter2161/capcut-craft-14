@@ -407,7 +407,7 @@ export const ExportVideoDialog = () => {
       const frameIntervalMs = 1000 / fps;
       const startTimestamp = performance.now();
       let frameCount = 0;
-      const playedSubtitles = new Set<string>();
+      const playedAudios = new Set<string>();
 
       await new Promise<void>((resolve) => {
         const recordingLoop = setInterval(() => {
@@ -415,12 +415,14 @@ export const ExportVideoDialog = () => {
           const currentTimeSeconds = virtualTimestamp / 1000;
           
           // Reproduzir áudio no momento correto
-          for (const { start, buffer, duration, volume, speed } of audioBuffers) {
-            const audioId = `${start}_${buffer.duration}`;
-            if (start <= currentTimeSeconds && !playedSubtitles.has(audioId)) {
-              const timeInAudio = currentTimeSeconds - start;
-              if (timeInAudio < duration) {
-                playedSubtitles.add(audioId);
+          audioBuffers.forEach(({ start, buffer, duration, volume, speed }, index) => {
+            const audioId = `audio_${index}_${start}`;
+            const shouldStart = currentTimeSeconds >= start && currentTimeSeconds < start + duration;
+            
+            if (shouldStart && !playedAudios.has(audioId)) {
+              playedAudios.add(audioId);
+              
+              try {
                 const source = audioContext.createBufferSource();
                 source.buffer = buffer;
                 source.playbackRate.value = speed;
@@ -431,12 +433,18 @@ export const ExportVideoDialog = () => {
                 source.connect(gainNode);
                 gainNode.connect(audioDestination);
                 
-                const offset = timeInAudio / speed;
-                const remainingDuration = (duration - timeInAudio) / speed;
-                source.start(audioContext.currentTime, offset, remainingDuration);
+                // Calcular offset se já passou do início
+                const offset = Math.max(0, (currentTimeSeconds - start) / speed);
+                const remainingDuration = Math.max(0, (duration - (currentTimeSeconds - start)) / speed);
+                
+                if (remainingDuration > 0) {
+                  source.start(audioContext.currentTime, offset, remainingDuration);
+                }
+              } catch (error) {
+                console.error('Erro ao reproduzir áudio:', error);
               }
             }
-          }
+          });
           
           // Renderizar frame
           renderFrame(ctx, virtualTimestamp, exportCanvas);
