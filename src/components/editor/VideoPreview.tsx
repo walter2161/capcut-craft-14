@@ -16,6 +16,8 @@ export const VideoPreview = () => {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const lastSpokenSubtitleRef = useRef<string>('');
+  const currentAudioClipRef = useRef<string | null>(null);
+  const lastRenderTimeRef = useRef<number>(0);
 
   // Resolve a drawable element for a media item (preloads images from URL strings)
   const getDrawable = (item: { type: 'image' | 'video' | 'audio'; data: any }): HTMLImageElement | HTMLVideoElement | null => {
@@ -68,6 +70,11 @@ export const VideoPreview = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Evitar re-renders muito rápidos
+    const now = Date.now();
+    if (now - lastRenderTimeRef.current < 16) return; // ~60fps max
+    lastRenderTimeRef.current = now;
+
     renderFrame(ctx, currentTime);
     
     // Gerenciar reprodução de áudio
@@ -77,6 +84,7 @@ export const VideoPreview = () => {
     } else {
       stopAudio();
       stopSpeech();
+      currentAudioClipRef.current = null;
     }
   }, [currentTime, clips, mediaItems, isPlaying]);
 
@@ -86,14 +94,24 @@ export const VideoPreview = () => {
       c => c.start <= time && c.start + c.duration > time
     );
 
-    if (!currentAudioClip) {
+    // Se mudou de clip ou não há clip, parar áudio atual
+    const clipId = currentAudioClip?.id || null;
+    if (clipId !== currentAudioClipRef.current) {
       stopAudio();
+      currentAudioClipRef.current = clipId;
+    }
+
+    if (!currentAudioClip) {
+      return;
+    }
+
+    // Se já está tocando o clip correto, não fazer nada
+    if (audioSourceRef.current && clipId === currentAudioClipRef.current) {
       return;
     }
 
     const mediaItem = mediaItems.find(m => m.id === currentAudioClip.mediaId);
     if (!mediaItem || !mediaItem.data) {
-      console.warn('Media item não encontrado ou sem dados de áudio');
       return;
     }
 
@@ -115,11 +133,8 @@ export const VideoPreview = () => {
       audioContext.resume();
     }
 
-    // Parar áudio anterior
-    stopAudio();
-
     try {
-      // Criar novo source (SEMPRE criar novo, não pode reutilizar)
+      // Criar novo source
       const source = audioContext.createBufferSource();
       source.buffer = mediaItem.data;
       
@@ -146,13 +161,6 @@ export const VideoPreview = () => {
       
       audioSourceRef.current = source;
       gainNodeRef.current = gainNode;
-      
-      console.log('Áudio iniciado:', {
-        clipId: currentAudioClip.id,
-        offset,
-        duration: remainingDuration,
-        volume: currentAudioClip.volume
-      });
     } catch (error) {
       console.error('Erro ao reproduzir áudio:', error);
     }
@@ -359,10 +367,29 @@ export const VideoPreview = () => {
 
   const canvasDimensions = getCanvasDimensions();
 
+  const clearCache = () => {
+    imageCacheRef.current.clear();
+    currentAudioClipRef.current = null;
+    stopAudio();
+    stopSpeech();
+    forceRerender(prev => prev + 1);
+  };
+
   return (
     <section className="flex-1 bg-black flex items-center justify-center relative">
       <div className="absolute top-4 right-4 z-10 flex gap-2 items-center bg-black/70 px-3 py-2 rounded-lg backdrop-blur-sm">
-        <span className="text-white text-sm font-semibold">{globalSettings.videoFormat}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={clearCache}
+          className="h-8 px-2 text-white hover:bg-white/20 text-xs"
+          title="Limpar cache e re-renderizar"
+        >
+          Limpar Cache
+        </Button>
+        <div className="border-l border-white/20 pl-2">
+          <span className="text-white text-sm font-semibold">{globalSettings.videoFormat}</span>
+        </div>
         <div className="flex gap-1 items-center border-l border-white/20 pl-2">
           <Button
             size="sm"
