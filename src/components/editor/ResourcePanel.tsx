@@ -80,9 +80,14 @@ export const ResourcePanel = () => {
       } else if (type === 'audio') {
         reader.onload = async (event) => {
           try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const arrayBuffer = event.target?.result as ArrayBuffer;
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            if (!arrayBuffer) {
+              toast.error("Erro ao ler arquivo de áudio");
+              return;
+            }
+            
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
             
             addMediaItem({
               id: mediaId,
@@ -93,12 +98,16 @@ export const ResourcePanel = () => {
             });
             toast.success(`Áudio "${file.name}" adicionado`);
           } catch (error) {
-            toast.error("Erro ao carregar áudio");
+            console.error("Erro ao carregar áudio:", error);
+            toast.error(`Erro ao carregar áudio: ${error instanceof Error ? error.message : 'desconhecido'}`);
           }
         };
         reader.readAsArrayBuffer(file);
       }
     }
+    
+    // Reset input to allow re-uploading the same file
+    e.target.value = '';
   };
 
   const handleAddToTimeline = (item: any) => {
