@@ -16,7 +16,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
 
 export const ExportVideoDialog = () => {
-  const { clips, mediaItems, globalSettings, totalDuration, projectName, setCurrentTime, setIsPlaying, isPlaying, currentTime, trackStates } = useEditorStore();
+  const { clips, mediaItems, globalSettings, totalDuration, projectName, setCurrentTime, setIsPlaying, isPlaying, currentTime, trackStates, thumbnailData } = useEditorStore();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -78,6 +78,107 @@ export const ExportVideoDialog = () => {
     }
     
     return { drawWidth, drawHeight, offsetX, offsetY };
+  };
+
+  const renderThumbnail = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    // Pegar a primeira imagem dos clips
+    const firstImageClip = clips.find(c => c.type === 'image' && c.track.startsWith('V'));
+    if (!firstImageClip) return;
+
+    const media = await loadDrawable(firstImageClip.mediaId);
+    if (!media) return;
+
+    // Desenhar a imagem de fundo
+    const imgProps = fitImageToCanvas(media, canvas);
+    ctx.drawImage(media, imgProps.offsetX, imgProps.offsetY, imgProps.drawWidth, imgProps.drawHeight);
+
+    // Calcular área 1:1 centralizada
+    const squareSize = Math.min(canvas.width, canvas.height);
+    const squareX = (canvas.width - squareSize) / 2;
+    const squareY = (canvas.height - squareSize) / 2;
+
+    // Overlay semi-transparente
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Card centralizado
+    const cardPadding = squareSize * 0.1;
+    const cardX = squareX + cardPadding;
+    const cardY = squareY + cardPadding;
+    const cardWidth = squareSize - (cardPadding * 2);
+    const cardHeight = squareSize - (cardPadding * 2);
+
+    // Fundo do card com gradiente
+    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    gradient.addColorStop(1, 'rgba(240, 240, 240, 0.95)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+
+    // Borda do card
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+
+    // Renderizar conteúdo
+    const fontSize = squareSize * 0.05;
+    const lineHeight = fontSize * 1.5;
+    let currentY = cardY + cardHeight * 0.15;
+
+    // Título
+    if (thumbnailData.title) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = `bold ${fontSize * 1.4}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(thumbnailData.title, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 2;
+    }
+
+    // Preço
+    if (thumbnailData.price) {
+      ctx.fillStyle = '#16a34a';
+      ctx.font = `bold ${fontSize * 1.8}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(thumbnailData.price, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 2.5;
+    }
+
+    // Características em grid
+    const startY = currentY;
+
+    ctx.font = `${fontSize}px Inter, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+
+    if (thumbnailData.bedrooms) {
+      const x = cardX + cardWidth * 0.25;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText('🛏️', x, startY);
+      ctx.fillText(`${thumbnailData.bedrooms} quartos`, x, startY + lineHeight);
+    }
+
+    if (thumbnailData.bathrooms) {
+      const x = cardX + cardWidth * 0.75;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText('🚿', x, startY);
+      ctx.fillText(`${thumbnailData.bathrooms} banheiros`, x, startY + lineHeight);
+    }
+
+    currentY += lineHeight * 3;
+
+    if (thumbnailData.area) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(`📐 ${thumbnailData.area} m²`, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 1.5;
+    }
+
+    // Localização
+    if (thumbnailData.location) {
+      currentY = cardY + cardHeight - cardHeight * 0.15;
+      ctx.fillStyle = '#666666';
+      ctx.font = `${fontSize * 0.9}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`📍 ${thumbnailData.location}`, cardX + cardWidth / 2, currentY);
+    }
   };
 
   const loadDrawable = async (mediaId: string) => {
@@ -170,8 +271,17 @@ export const ExportVideoDialog = () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Renderizar thumbnail se estiver habilitada e time < 1000ms
+    if (thumbnailData.enabled && time < 1000) {
+      await renderThumbnail(ctx, canvas);
+      return;
+    }
+
+    // Ajustar tempo se thumbnail estiver habilitada (subtrair 1 segundo)
+    const adjustedTime = thumbnailData.enabled ? time - 1000 : time;
+
     const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
-    const currentClip = videoClips.find(c => c.start <= time && c.start + c.duration > time);
+    const currentClip = videoClips.find(c => c.start <= adjustedTime && c.start + c.duration > adjustedTime);
     if (!currentClip) return;
 
     // Verificar se o track está oculto
@@ -181,7 +291,7 @@ export const ExportVideoDialog = () => {
     const media = await loadDrawable(currentClip.mediaId);
     if (!media) return;
 
-    const timeInClip = time - currentClip.start;
+    const timeInClip = adjustedTime - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
 
     // Vídeo: sincronizar tempo antes de desenhar
@@ -269,7 +379,7 @@ export const ExportVideoDialog = () => {
     // Renderizar legendas (respeitando hidden)
     const subtitleClips = clips.filter(c => c.type === 'subtitle');
     const currentSubtitle = subtitleClips.find(
-      c => c.start <= time && c.start + c.duration > time
+      c => c.start <= adjustedTime && c.start + c.duration > adjustedTime
     );
 
     if (currentSubtitle && currentSubtitle.text) {
@@ -332,7 +442,9 @@ export const ExportVideoDialog = () => {
     try {
       const dimensions = getVideoDimensions();
       const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
-      const durationMs = Math.max(totalDuration, 2000);
+      // Adicionar 1 segundo se thumbnail estiver habilitada
+      const baseDuration = Math.max(totalDuration, 2000);
+      const durationMs = thumbnailData.enabled ? baseDuration + 1000 : baseDuration;
 
       // Criar canvas dedicado para exportação
       const exportCanvas = document.createElement('canvas');
@@ -373,8 +485,10 @@ export const ExportVideoDialog = () => {
         
         const mediaItem = mediaItems.find(m => m.id === audioClip.mediaId);
         if (mediaItem && mediaItem.data instanceof AudioBuffer) {
+          // Ajustar start time se thumbnail estiver habilitada
+          const adjustedStart = thumbnailData.enabled ? (audioClip.start / 1000) + 1 : audioClip.start / 1000;
           audioBuffers.push({
-            start: audioClip.start / 1000,
+            start: adjustedStart,
             buffer: mediaItem.data,
             duration: audioClip.duration / 1000,
             volume: audioClip.volume,
@@ -412,8 +526,10 @@ export const ExportVideoDialog = () => {
             audioContext.sampleRate
           );
 
+          // Ajustar start time se thumbnail estiver habilitada
+          const adjustedStart = thumbnailData.enabled ? (subtitle.start / 1000) + 1 : subtitle.start / 1000;
           audioBuffers.push({
-            start: subtitle.start / 1000,
+            start: adjustedStart,
             buffer,
             duration: estimatedDuration,
             volume: subtitle.volume || 1.0,

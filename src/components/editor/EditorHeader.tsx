@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/store/editorStore";
 import { ExportVideoDialog } from "./ExportVideoDialog";
+import { ThumbnailEditor } from "./ThumbnailEditor";
 import { toast } from "sonner";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -136,6 +137,8 @@ export const EditorHeader = () => {
           <FolderOpen className="w-4 h-4 sm:mr-2" />
           <span className="hidden sm:inline">Abrir</span>
         </Button>
+        
+        <ThumbnailEditor />
         
         <ExportVideoDialog />
       </div>

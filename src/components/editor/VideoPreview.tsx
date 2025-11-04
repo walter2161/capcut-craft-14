@@ -10,7 +10,7 @@ export const VideoPreview = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const { clips, mediaItems, currentTime, isPlaying, globalSettings, trackStates } = useEditorStore();
+  const { clips, mediaItems, currentTime, isPlaying, globalSettings, trackStates, thumbnailData } = useEditorStore();
   const [zoom, setZoom] = useState(1);
   const [, forceRerender] = useState(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
@@ -276,10 +276,122 @@ export const VideoPreview = () => {
     return { drawWidth, drawHeight, offsetX, offsetY };
   };
 
+  const renderThumbnail = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    // Pegar a primeira imagem dos clips
+    const firstImageClip = clips.find(c => c.type === 'image' && c.track.startsWith('V'));
+    if (!firstImageClip) return;
+
+    const mediaItem = mediaItems.find(m => m.id === firstImageClip.mediaId);
+    if (!mediaItem) return;
+
+    const media = getDrawable(mediaItem);
+    if (!media) return;
+
+    // Desenhar a imagem de fundo
+    const imgProps = fitImageToCanvas(media, canvas);
+    ctx.drawImage(media, imgProps.offsetX, imgProps.offsetY, imgProps.drawWidth, imgProps.drawHeight);
+
+    // Calcular área 1:1 centralizada
+    const squareSize = Math.min(canvas.width, canvas.height);
+    const squareX = (canvas.width - squareSize) / 2;
+    const squareY = (canvas.height - squareSize) / 2;
+
+    // Overlay semi-transparente
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Card centralizado
+    const cardPadding = squareSize * 0.1;
+    const cardX = squareX + cardPadding;
+    const cardY = squareY + cardPadding;
+    const cardWidth = squareSize - (cardPadding * 2);
+    const cardHeight = squareSize - (cardPadding * 2);
+
+    // Fundo do card com gradiente
+    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    gradient.addColorStop(1, 'rgba(240, 240, 240, 0.95)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+
+    // Borda do card
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+
+    // Renderizar conteúdo
+    const fontSize = squareSize * 0.05;
+    const lineHeight = fontSize * 1.5;
+    let currentY = cardY + cardHeight * 0.15;
+
+    // Título
+    if (thumbnailData.title) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = `bold ${fontSize * 1.4}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(thumbnailData.title, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 2;
+    }
+
+    // Preço
+    if (thumbnailData.price) {
+      ctx.fillStyle = '#16a34a';
+      ctx.font = `bold ${fontSize * 1.8}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(thumbnailData.price, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 2.5;
+    }
+
+    // Características em grid
+    const iconSize = fontSize * 0.9;
+    const startY = currentY;
+    const itemSpacing = cardWidth * 0.25;
+
+    ctx.font = `${fontSize}px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+
+    if (thumbnailData.bedrooms) {
+      const x = cardX + cardWidth * 0.25;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText('🛏️', x, startY);
+      ctx.fillText(`${thumbnailData.bedrooms} quartos`, x, startY + lineHeight);
+    }
+
+    if (thumbnailData.bathrooms) {
+      const x = cardX + cardWidth * 0.75;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText('🚿', x, startY);
+      ctx.fillText(`${thumbnailData.bathrooms} banheiros`, x, startY + lineHeight);
+    }
+
+    currentY += lineHeight * 3;
+
+    if (thumbnailData.area) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(`📐 ${thumbnailData.area} m²`, cardX + cardWidth / 2, currentY);
+      currentY += lineHeight * 1.5;
+    }
+
+    // Localização
+    if (thumbnailData.location) {
+      currentY = cardY + cardHeight - cardHeight * 0.15;
+      ctx.fillStyle = '#666666';
+      ctx.font = `${fontSize * 0.9}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`📍 ${thumbnailData.location}`, cardX + cardWidth / 2, currentY);
+    }
+  };
+
   const renderFrame = (ctx: CanvasRenderingContext2D, time: number) => {
     const canvas = ctx.canvas;
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Renderizar thumbnail se estiver habilitada e time < 1000ms
+    if (thumbnailData.enabled && time < 1000) {
+      renderThumbnail(ctx, canvas);
+      return;
+    }
 
     const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
     

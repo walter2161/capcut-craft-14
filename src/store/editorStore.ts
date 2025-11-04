@@ -36,6 +36,16 @@ export interface TrackState {
   hidden: boolean;
 }
 
+export interface ThumbnailData {
+  enabled: boolean;
+  title: string;
+  price: string;
+  bedrooms: string;
+  bathrooms: string;
+  area: string;
+  location: string;
+}
+
 export interface GlobalSettings {
   defaultImageDuration: number;
   defaultTransitionDuration: number;
@@ -55,6 +65,7 @@ interface EditorState {
   globalSettings: GlobalSettings;
   projectName: string;
   trackStates: TrackState[];
+  thumbnailData: ThumbnailData;
   
   addMediaItem: (item: MediaItem) => void;
   removeMediaItem: (id: string) => void;
@@ -76,6 +87,7 @@ interface EditorState {
   toggleTrackMute: (trackName: string) => void;
   toggleTrackVisibility: (trackName: string) => void;
   addTrackState: (trackName: string) => void;
+  updateThumbnailData: (data: Partial<ThumbnailData>) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -99,6 +111,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     { name: 'V1', muted: false, hidden: false },
     { name: 'A1', muted: false, hidden: false },
   ],
+  thumbnailData: {
+    enabled: false,
+    title: '',
+    price: '',
+    bedrooms: '',
+    bathrooms: '',
+    area: '',
+    location: '',
+  },
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
@@ -267,5 +288,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addTrackState: (trackName) => set((state) => ({
     trackStates: [...state.trackStates, { name: trackName, muted: false, hidden: false }]
+  })),
+
+  updateThumbnailData: (data) => set((state) => ({
+    thumbnailData: { ...state.thumbnailData, ...data }
   })),
 }));
