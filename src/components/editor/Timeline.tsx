@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward, Scissors, Plus, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEditorStore } from "@/store/editorStore";
 import { GlobalSettingsDialog } from "./GlobalSettingsDialog";
 
@@ -337,8 +338,9 @@ export const Timeline = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden relative tracks-container">
-        {tracks.map((trackName, idx) => {
+      <ScrollArea className="flex-1">
+        <div className="overflow-x-auto relative tracks-container">
+          {tracks.map((trackName, idx) => {
           const trackClips = clips.filter(c => c.track === trackName);
           const isVideoTrack = trackName.startsWith('V');
           const isSubtitleTrack = trackName.startsWith('SUB');
@@ -423,34 +425,34 @@ export const Timeline = () => {
           );
         })}
         
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            const nextVideoNum = tracks.filter(t => t.startsWith('V')).length + 1;
-            const nextAudioNum = tracks.filter(t => t.startsWith('A')).length + 1;
-            setTracks([...tracks, `V${nextVideoNum}`, `A${nextAudioNum}`]);
-          }}
-          className="ml-20 my-2 text-xs"
-        >
-          <Plus className="w-3 h-3 mr-1" />
-          Adicionar Track
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const nextVideoNum = tracks.filter(t => t.startsWith('V')).length + 1;
+              const nextAudioNum = tracks.filter(t => t.startsWith('A')).length + 1;
+              setTracks([...tracks, `V${nextVideoNum}`, `A${nextAudioNum}`]);
+            }}
+            className="ml-20 my-2 text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Adicionar Track
+          </Button>
 
-        {/* Playhead */}
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-10 cursor-col-resize"
-          style={{
-            left: `${80 + currentTime / MS_PER_PIXEL}px`,
-          }}
-          onMouseDown={handlePlayheadMouseDown}
-        >
-          <div 
-            className="w-3 h-3 bg-[hsl(var(--playhead))] rounded-full -ml-1.5 -mt-1 cursor-grab active:cursor-grabbing"
-            onMouseDown={handlePlayheadMouseDown}
-          />
+          {/* Playhead */}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-10 cursor-col-resize pointer-events-none"
+            style={{
+              left: `${80 + currentTime / MS_PER_PIXEL}px`,
+            }}
+          >
+            <div 
+              className="w-3 h-3 bg-[hsl(var(--playhead))] rounded-full -ml-1.5 -mt-1 cursor-grab active:cursor-grabbing pointer-events-auto"
+              onMouseDown={handlePlayheadMouseDown}
+            />
+          </div>
         </div>
-      </div>
+      </ScrollArea>
     </footer>
   );
 };
