@@ -21,7 +21,7 @@ export const ExportVideoDialog = () => {
   const [exportProgress, setExportProgress] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  const hasClips = clips.some(c => c.type === 'image' || c.type === 'video');
+  const hasClips = clips.length > 0;
 
   const getVideoDimensions = () => {
     switch (globalSettings.videoFormat) {
@@ -361,9 +361,19 @@ export const ExportVideoDialog = () => {
       console.log('Trilhas combinadas - vídeo:', videoStream.getVideoTracks().length, 'áudio:', audioDestination.stream.getAudioTracks().length);
       
       // Configurar MediaRecorder com áudio e vídeo
-      const candidateTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
-      const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
-      const mimeType = supported ? candidateTypes.find(t => supported(t)) || 'video/webm' : 'video/webm';
+      const candidateTypes = [
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+        'video/mp4;codecs=h264,aac',
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ];
+      const isSupported = (type: string) => {
+        const MR = (window as any).MediaRecorder;
+        return MR && typeof MR.isTypeSupported === 'function' ? MR.isTypeSupported(type) : false;
+      };
+      const mimeType = candidateTypes.find(isSupported) || 'video/webm';
       
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
@@ -392,22 +402,53 @@ export const ExportVideoDialog = () => {
               return;
             }
 
+            // Se o navegador suportar MP4 nativamente, baixar direto
+            if (mimeType.includes('mp4')) {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.mp4`;
+              a.click();
+              URL.revokeObjectURL(url);
+              toast.success("Vídeo exportado em MP4 com sucesso!");
+              setIsExporting(false);
+              setExportProgress(100);
+              setTimeout(() => setIsOpen(false), 1500);
+              resolve();
+              return;
+            }
+
             // Transcodificar para MP4 (H.264 + AAC)
             setExportProgress((p) => Math.min(95, p));
             toast.message("Convertendo para MP4... isso pode levar alguns minutos");
 
             const ffmpeg = new FFmpeg();
-            await ffmpeg.load({
-              coreURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.js', 'text/javascript'),
-              wasmURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.wasm', 'application/wasm'),
-              workerURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.worker.js', 'text/javascript'),
-            });
+
+            // Tentar múltiplos CDNs para carregar o core do FFmpeg
+            const bases = [
+              'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.2/dist/ffmpeg-core',
+              'https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core'
+            ];
+            let loaded = false;
+            for (const base of bases) {
+              try {
+                await ffmpeg.load({
+                  coreURL: await toBlobURL(`${base}.js`, 'text/javascript'),
+                  wasmURL: await toBlobURL(`${base}.wasm`, 'application/wasm'),
+                  workerURL: await toBlobURL(`${base}.worker.js`, 'text/javascript'),
+                });
+                loaded = true;
+                break;
+              } catch (e) {
+                console.warn('Falha ao carregar FFmpeg de', base, e);
+              }
+            }
+            if (!loaded) throw new Error('Não foi possível carregar o FFmpeg');
 
             const inputName = 'input.webm';
             const outputName = 'output.mp4';
             await ffmpeg.writeFile(inputName, await fetchFile(blob));
 
-            // -preset veryfast para acelerar, ajuste CRF conforme necessário
             await ffmpeg.exec([
               '-i', inputName,
               '-c:v', 'libx264',
@@ -454,7 +495,31 @@ export const ExportVideoDialog = () => {
       // Iniciar gravação
       mediaRecorder.start();
       
-      // Renderizar frames e reproduzir áudio
+      // Pré-agendar fontes de áudio para o MediaStreamDestination
+      const scheduledSources: AudioBufferSourceNode[] = [];
+      const baseTime = audioContext.currentTime;
+      audioBuffers.forEach(({ start, buffer, duration, volume, speed }) => {
+        try {
+          const source = audioContext.createBufferSource();
+          source.buffer = buffer;
+          source.playbackRate.value = speed;
+
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = volume;
+
+          source.connect(gainNode);
+          gainNode.connect(audioDestination);
+
+          const when = baseTime + Math.max(0, start);
+          const maxDur = Math.max(0, Math.min(buffer.duration / speed, duration / speed));
+          source.start(when, 0, maxDur);
+          scheduledSources.push(source);
+        } catch (e) {
+          console.error('Agendamento de áudio falhou:', e);
+        }
+      });
+      
+      // Renderizar frames
       const frameIntervalMs = 1000 / fps;
       const startTimestamp = performance.now();
       let frameCount = 0;
@@ -465,38 +530,7 @@ export const ExportVideoDialog = () => {
           const virtualTimestamp = performance.now() - startTimestamp;
           const currentTimeSeconds = virtualTimestamp / 1000;
           
-          // Reproduzir áudio no momento correto
-          audioBuffers.forEach(({ start, buffer, duration, volume, speed }, index) => {
-            const audioId = `audio_${index}_${start}`;
-            const shouldStart = currentTimeSeconds >= start && currentTimeSeconds < start + duration;
-            
-            if (shouldStart && !playedAudios.has(audioId)) {
-              playedAudios.add(audioId);
-              
-              try {
-                const source = audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.playbackRate.value = speed;
-                
-                const gainNode = audioContext.createGain();
-                gainNode.gain.value = volume;
-                
-                source.connect(gainNode);
-                gainNode.connect(audioDestination);
-                
-                // Calcular offset se já passou do início
-                const offset = Math.max(0, (currentTimeSeconds - start) / speed);
-                const remainingDuration = Math.max(0, (duration - (currentTimeSeconds - start)) / speed);
-                
-                if (remainingDuration > 0) {
-                  source.start(audioContext.currentTime, offset, remainingDuration);
-                }
-              } catch (error) {
-                console.error('Erro ao reproduzir áudio:', error);
-              }
-            }
-          });
-          
+          // Áudio já pré-agendado acima
           // Renderizar frame
           renderFrame(ctx, virtualTimestamp, exportCanvas);
           
