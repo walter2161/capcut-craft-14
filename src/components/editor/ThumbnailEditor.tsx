@@ -37,12 +37,13 @@ export const ThumbnailEditor = () => {
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="sm"
           title="Editar thumbnail do vídeo"
-          className={thumbnailData.enabled ? "text-primary" : ""}
+          className={thumbnailData.enabled ? "border-primary text-primary" : ""}
         >
-          <Image className="w-4 h-4" />
+          <Image className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Thumb</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
