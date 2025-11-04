@@ -49,7 +49,8 @@ const VideoEditor = () => {
           bedrooms,
           bathrooms,
           area,
-          location
+          location,
+          referencia: propertyData.referencia || ''
         });
       }
     }

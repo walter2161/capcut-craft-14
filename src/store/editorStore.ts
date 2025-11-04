@@ -44,6 +44,7 @@ export interface ThumbnailData {
   bathrooms: string;
   area: string;
   location: string;
+  referencia: string;
   // Configurações visuais
   cardBgColor: string;
   cardBgOpacity: number;
@@ -132,6 +133,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     bathrooms: '',
     area: '',
     location: '',
+    referencia: '',
     // Valores padrão para configurações visuais
     cardBgColor: '#ffffff',
     cardBgOpacity: 0.95,

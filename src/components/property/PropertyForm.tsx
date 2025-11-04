@@ -33,7 +33,7 @@ export const PropertyForm = () => {
       <div>
         <h2 className="text-2xl font-bold mb-4">Informações do Imóvel</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <Label>Tipo de Imóvel</Label>
             <Select value={propertyData?.tipo} onValueChange={(v) => updateField('tipo', v)}>
@@ -63,6 +63,15 @@ export const PropertyForm = () => {
                 <SelectItem value="Temporada">Temporada</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label>Código Referência</Label>
+            <Input 
+              value={propertyData?.referencia || ''}
+              onChange={(e) => updateField('referencia', e.target.value)}
+              placeholder="Ex: 12345"
+            />
           </div>
         </div>
 

@@ -405,6 +405,15 @@ export const VideoPreview = () => {
       ctx.textAlign = 'center';
       ctx.fillText(`📍 ${thumbnailData.location}`, cardX + cardWidth / 2, currentY);
     }
+
+    // Código de referência
+    if (thumbnailData.referencia) {
+      currentY = cardY + cardHeight - cardHeight * 0.05;
+      ctx.fillStyle = thumbnailData.textColor;
+      ctx.font = `${baseFontSize * thumbnailData.textFontSize * 0.8}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`REF: ${thumbnailData.referencia}`, cardX + cardWidth / 2, currentY);
+    }
   };
 
   const renderFrame = (ctx: CanvasRenderingContext2D, time: number) => {

@@ -239,6 +239,14 @@ export const ThumbnailEditor = () => {
         ctx.font = `${baseFontSize * formData.textFontSize * 0.9}px Arial`;
         ctx.fillText(`📍 ${formData.location}`, cardX + cardWidth / 2, currentY);
       }
+
+      // Código de referência
+      if (formData.referencia) {
+        currentY = cardY + cardHeight - cardHeight * 0.05;
+        ctx.fillStyle = formData.textColor;
+        ctx.font = `${baseFontSize * formData.textFontSize * 0.8}px Arial`;
+        ctx.fillText(`REF: ${formData.referencia}`, cardX + cardWidth / 2, currentY);
+      }
     };
 
     // Lidar com diferentes tipos de dados de imagem
@@ -446,6 +454,18 @@ export const ThumbnailEditor = () => {
                       value={formData.location}
                       onChange={(e) => 
                         setFormData({ ...formData, location: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="referencia">Código Referência</Label>
+                    <Input
+                      id="referencia"
+                      placeholder="Ex: 12345"
+                      value={formData.referencia}
+                      onChange={(e) => 
+                        setFormData({ ...formData, referencia: e.target.value })
                       }
                     />
                   </div>
