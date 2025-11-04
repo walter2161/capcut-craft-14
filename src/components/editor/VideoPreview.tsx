@@ -81,7 +81,7 @@ export const VideoPreview = () => {
   }, [currentTime, clips, mediaItems, isPlaying]);
 
   const playAudio = (time: number) => {
-    const audioClips = clips.filter(c => c.track === 'A1');
+    const audioClips = clips.filter(c => c.type === 'audio');
     const currentAudioClip = audioClips.find(
       c => c.start <= time && c.start + c.duration > time
     );

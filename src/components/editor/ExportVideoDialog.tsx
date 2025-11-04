@@ -281,13 +281,30 @@ export const ExportVideoDialog = () => {
         toast.warning(`Algumas mídias não puderam ser preparadas (CORS): ${failed}`);
       }
 
-      // Criar AudioContext para capturar áudio das legendas
+      // Criar AudioContext para capturar áudio
       const audioContext = new AudioContext({ sampleRate: 48000 });
       const audioDestination = audioContext.createMediaStreamDestination();
 
-      // Preparar sintetizador de voz
+      // Preparar clips de áudio
+      const audioClips = clips.filter(c => c.type === 'audio').sort((a, b) => a.start - b.start);
+      
+      // Preparar sintetizador de voz para legendas
       const subtitleClips = clips.filter(c => c.type === 'subtitle').sort((a, b) => a.start - b.start);
-      const audioBuffers: { start: number; buffer: AudioBuffer }[] = [];
+      const audioBuffers: { start: number; buffer: AudioBuffer; duration: number; volume: number; speed: number }[] = [];
+
+      // Adicionar buffers de áudio dos clips de áudio
+      for (const audioClip of audioClips) {
+        const mediaItem = mediaItems.find(m => m.id === audioClip.mediaId);
+        if (mediaItem && mediaItem.data instanceof AudioBuffer) {
+          audioBuffers.push({
+            start: audioClip.start / 1000,
+            buffer: mediaItem.data,
+            duration: audioClip.duration / 1000,
+            volume: audioClip.volume,
+            speed: audioClip.speed
+          });
+        }
+      }
 
       // Gerar áudio para cada legenda
       for (const subtitle of subtitleClips) {
@@ -316,7 +333,13 @@ export const ExportVideoDialog = () => {
             audioContext.sampleRate
           );
 
-          audioBuffers.push({ start: subtitle.start / 1000, buffer });
+          audioBuffers.push({
+            start: subtitle.start / 1000,
+            buffer,
+            duration: estimatedDuration,
+            volume: subtitle.volume || 1.0,
+            speed: 1.0
+          });
         } catch (error) {
           console.warn('Erro ao gerar áudio da legenda:', error);
         }
@@ -391,16 +414,26 @@ export const ExportVideoDialog = () => {
           const virtualTimestamp = performance.now() - startTimestamp;
           const currentTimeSeconds = virtualTimestamp / 1000;
           
-          // Reproduzir áudio das legendas no momento correto
-          for (const { start, buffer } of audioBuffers) {
-            if (start <= currentTimeSeconds && start + buffer.duration > currentTimeSeconds) {
-              const subtitleId = `${start}`;
-              if (!playedSubtitles.has(subtitleId)) {
-                playedSubtitles.add(subtitleId);
+          // Reproduzir áudio no momento correto
+          for (const { start, buffer, duration, volume, speed } of audioBuffers) {
+            const audioId = `${start}_${buffer.duration}`;
+            if (start <= currentTimeSeconds && !playedSubtitles.has(audioId)) {
+              const timeInAudio = currentTimeSeconds - start;
+              if (timeInAudio < duration) {
+                playedSubtitles.add(audioId);
                 const source = audioContext.createBufferSource();
                 source.buffer = buffer;
-                source.connect(audioDestination);
-                source.start(audioContext.currentTime);
+                source.playbackRate.value = speed;
+                
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = volume;
+                
+                source.connect(gainNode);
+                gainNode.connect(audioDestination);
+                
+                const offset = timeInAudio / speed;
+                const remainingDuration = (duration - timeInAudio) / speed;
+                source.start(audioContext.currentTime, offset, remainingDuration);
               }
             }
           }
