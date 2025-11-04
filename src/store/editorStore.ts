@@ -25,7 +25,8 @@ export interface Clip {
   opacity: number;
   transition?: 'cross-fade' | 'none';
   transitionDuration?: number;
-  text?: string; // Para clips de legenda
+  text?: string; // Texto da legenda
+  readingSpeed?: number; // Velocidade de leitura (palavras por minuto)
 }
 
 export interface GlobalSettings {

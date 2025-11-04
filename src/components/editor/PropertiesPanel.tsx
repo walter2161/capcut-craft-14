@@ -2,6 +2,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 export const PropertiesPanel = () => {
   const { selectedClipId, selectedClipIds, clips, updateClip, removeClip, duplicateClip } = useEditorStore();
@@ -199,6 +200,74 @@ export const PropertiesPanel = () => {
                   min={0.5}
                   max={2}
                   step={0.1}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedClip.type === 'subtitle' && (
+        <div className="space-y-6">
+          <div>
+            <h4 className="font-medium mb-4">Configurações da Legenda</h4>
+            
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm mb-2 block">Texto da Legenda</Label>
+                <Textarea
+                  value={selectedClip.text || ''}
+                  onChange={(e) => updateClip(selectedClip.id, { text: e.target.value })}
+                  placeholder="Digite o texto da legenda..."
+                  className="min-h-24"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Velocidade de Leitura</Label>
+                  <span className="text-sm font-semibold">{selectedClip.speed?.toFixed(1) || '1.0'}x</span>
+                </div>
+                <Slider
+                  value={[selectedClip.speed || 1.0]}
+                  onValueChange={(v) => handleChange('speed', v)}
+                  min={0.5}
+                  max={2}
+                  step={0.1}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controla a velocidade do áudio da legenda
+                </p>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Tempo de Exposição (ms)</Label>
+                  <span className="text-sm font-semibold">{selectedClip.duration}ms</span>
+                </div>
+                <Slider
+                  value={[selectedClip.duration]}
+                  onValueChange={(v) => handleChange('duration', v)}
+                  min={500}
+                  max={15000}
+                  step={100}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Duração que a legenda fica visível na tela
+                </p>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Volume do Áudio</Label>
+                  <span className="text-sm font-semibold">{Math.round((selectedClip.volume || 1.0) * 100)}%</span>
+                </div>
+                <Slider
+                  value={[selectedClip.volume || 1.0]}
+                  onValueChange={(v) => handleChange('volume', v)}
+                  min={0}
+                  max={2}
+                  step={0.01}
                 />
               </div>
             </div>
