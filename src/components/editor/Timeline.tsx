@@ -345,6 +345,39 @@ export const Timeline = () => {
       <div className="flex-1 relative overflow-hidden">
         <ScrollArea className="h-full w-full">
           <div className="relative tracks-container" style={{ minWidth: `${Math.max(1200, totalDuration / MS_PER_PIXEL + 100)}px` }}>
+            {/* Régua de tempo */}
+            <div 
+              className="h-8 flex bg-[hsl(var(--timeline-bg))] border-b border-border cursor-pointer"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left - 112;
+                const newTime = Math.max(0, Math.min(totalDuration, offsetX * MS_PER_PIXEL));
+                setCurrentTime(newTime);
+                setIsPlaying(false);
+              }}
+            >
+              <div className="w-28 min-w-28 border-r border-border flex items-center justify-center">
+                <span className="text-xs font-semibold">Tempo</span>
+              </div>
+              <div className="flex-1 relative">
+                {/* Marcadores de tempo */}
+                {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => {
+                  const timeMs = i * 1000;
+                  const position = timeMs / MS_PER_PIXEL;
+                  return (
+                    <div
+                      key={i}
+                      className="absolute top-0 bottom-0 flex flex-col items-center"
+                      style={{ left: `${position}px` }}
+                    >
+                      <div className="h-2 w-px bg-border"></div>
+                      <span className="text-xs text-muted-foreground mt-1">{formatTime(timeMs)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {tracks.map((trackName, idx) => {
             const trackClips = clips.filter(c => c.track === trackName);
             const trackState = trackStates.find(t => t.name === trackName) || { muted: false, hidden: false };
