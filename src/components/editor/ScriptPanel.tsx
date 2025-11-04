@@ -114,7 +114,7 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
     toast.info('Gerando áudio da narração...');
 
     try {
-      console.log('Iniciando conversão de texto para áudio com Google TTS...');
+      console.log('Iniciando conversão de texto para áudio com travisvn TTS...');
       
       // Limpar o texto removendo qualquer marcação ou formatação
       const cleanText = script
@@ -125,46 +125,27 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       
       console.log('Texto limpo:', cleanText);
       
-      // Usar Google Cloud Text-to-Speech API
-      const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyCGNKs7LHU48mB2IHSKcLBM3NYxhKV67GQ`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            input: { text: cleanText },
-            voice: {
-              languageCode: 'pt-BR',
-              name: 'pt-BR-Standard-A',
-              ssmlGender: 'FEMALE'
-            },
-            audioConfig: {
-              audioEncoding: 'MP3',
-              pitch: 0,
-              speakingRate: 1.0
-            }
-          })
-        }
-      );
+      // Usar travisvn TTS API
+      const response = await fetch('https://tts.travisvn.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          input: cleanText,
+          model: 'tts-1',
+          voice: 'pt-BR-FranciscaNeural',
+          response_format: 'mp3'
+        })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Erro na API do Google:', errorData);
+        const errorText = await response.text();
+        console.error('Erro na API travisvn:', errorText);
         throw new Error('Erro ao gerar áudio');
       }
 
-      const data = await response.json();
-      const audioContent = data.audioContent;
-      
-      // Converter base64 para Blob
-      const binaryString = atob(audioContent);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
+      const audioBlob = await response.blob();
       
       console.log('Áudio gerado com sucesso:', audioBlob);
 
