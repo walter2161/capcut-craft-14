@@ -92,129 +92,138 @@ export const ExportVideoDialog = () => {
     const imgProps = fitImageToCanvas(media, canvas);
     ctx.drawImage(media, imgProps.offsetX, imgProps.offsetY, imgProps.drawWidth, imgProps.drawHeight);
 
-    // Overlay semi-transparente (usando configuração)
-    ctx.fillStyle = `rgba(0, 0, 0, ${thumbnailData.overlayOpacity})`;
+    // Gradient overlay (escuro embaixo, transparente em cima)
+    const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+    gradient.addColorStop(0, `rgba(0, 0, 0, ${thumbnailData.overlayOpacity * 0.55})`);
+    gradient.addColorStop(0.5, `rgba(0, 0, 0, ${thumbnailData.overlayOpacity * 0.15})`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Calcular área 1:1 centralizada
+    // Área 1x1 centralizada (65% de largura)
     const squareSize = Math.min(canvas.width, canvas.height);
-    const squareX = (canvas.width - squareSize) / 2;
-    const squareY = (canvas.height - squareSize) / 2;
-
-    // Card centralizado
-    const cardPadding = squareSize * thumbnailData.cardPadding;
-    const cardX = squareX + cardPadding;
-    const cardY = squareY + cardPadding;
-    const cardWidth = squareSize - (cardPadding * 2);
-    const cardHeight = squareSize - (cardPadding * 2);
-
-    // Converter hex para rgba
-    const hexToRgba = (hex: string, opacity: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
-
-    // Fundo do card (usando configuração)
-    ctx.fillStyle = hexToRgba(thumbnailData.cardBgColor, thumbnailData.cardBgOpacity);
+    const areaWidth = squareSize * 0.65;
+    const areaHeight = areaWidth;
+    const areaX = (canvas.width - areaWidth) / 2;
+    const areaY = (canvas.height - areaHeight) / 2;
     
-    if (thumbnailData.borderRadius > 0) {
-      const radius = thumbnailData.borderRadius;
-      ctx.beginPath();
-      ctx.moveTo(cardX + radius, cardY);
-      ctx.lineTo(cardX + cardWidth - radius, cardY);
-      ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
-      ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
-      ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
-      ctx.lineTo(cardX + radius, cardY + cardHeight);
-      ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
-      ctx.lineTo(cardX, cardY + radius);
-      ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
-      ctx.closePath();
-      ctx.fill();
-      
-      // Borda
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    } else {
-      ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
-      
-      // Borda do card
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
-    }
+    const padding = areaWidth * 0.05;
+    const contentX = areaX + padding;
+    const contentY = areaY + areaHeight - padding;
+    const contentWidth = areaWidth - (padding * 2);
 
-    // Renderizar conteúdo
-    const baseFontSize = squareSize * 0.05;
-    const lineHeight = baseFontSize * 1.5;
-    let currentY = cardY + cardHeight * 0.15;
+    // Configurar text shadow para todos os textos
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 3;
 
-    // Título
-    if (thumbnailData.title) {
-      ctx.fillStyle = thumbnailData.titleColor;
-      ctx.font = `bold ${baseFontSize * thumbnailData.titleFontSize}px Inter, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(thumbnailData.title, cardX + cardWidth / 2, currentY);
-      currentY += lineHeight * 2;
-    }
+    const baseFontSize = areaWidth * 0.055;
+    const lineHeight = baseFontSize * 1.2;
+    let currentY = contentY;
 
-    // Preço
-    if (thumbnailData.price) {
-      ctx.fillStyle = thumbnailData.priceColor;
-      ctx.font = `bold ${baseFontSize * thumbnailData.priceFontSize}px Inter, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(thumbnailData.price, cardX + cardWidth / 2, currentY);
-      currentY += lineHeight * 2.5;
-    }
-
-    // Características em grid
-    const startY = currentY;
-
-    ctx.font = `${baseFontSize * thumbnailData.textFontSize}px Inter, Arial, sans-serif`;
+    // Detalhes (de baixo para cima)
+    ctx.font = `600 ${baseFontSize * thumbnailData.textFontSize}px Inter, Arial, sans-serif`;
     ctx.textAlign = 'center';
 
-    if (thumbnailData.bedrooms) {
-      const x = cardX + cardWidth * 0.25;
-      ctx.fillStyle = thumbnailData.textColor;
-      ctx.fillText('🛏️', x, startY);
-      ctx.fillText(`${thumbnailData.bedrooms} quartos`, x, startY + lineHeight);
-    }
-
-    if (thumbnailData.bathrooms) {
-      const x = cardX + cardWidth * 0.75;
-      ctx.fillStyle = thumbnailData.textColor;
-      ctx.fillText('🚿', x, startY);
-      ctx.fillText(`${thumbnailData.bathrooms} banheiros`, x, startY + lineHeight);
-    }
-
-    currentY += lineHeight * 3;
-
+    // Área
     if (thumbnailData.area) {
       ctx.fillStyle = thumbnailData.textColor;
-      ctx.fillText(`📐 ${thumbnailData.area} m²`, cardX + cardWidth / 2, currentY);
-      currentY += lineHeight * 1.5;
+      ctx.fillText(`📐 ${thumbnailData.area}m² Área Útil`, contentX + contentWidth / 2, currentY);
+      currentY -= lineHeight * 1.3;
+    }
+
+    // Banheiros
+    if (thumbnailData.bathrooms) {
+      ctx.fillStyle = thumbnailData.textColor;
+      ctx.fillText(`🚿 ${thumbnailData.bathrooms} Banheiro${thumbnailData.bathrooms !== '1' ? 's' : ''}`, contentX + contentWidth / 2, currentY);
+      currentY -= lineHeight * 1.3;
+    }
+
+    // Quartos
+    if (thumbnailData.bedrooms) {
+      ctx.fillStyle = thumbnailData.textColor;
+      ctx.fillText(`🛏️ ${thumbnailData.bedrooms} Quarto${thumbnailData.bedrooms !== '1' ? 's' : ''}`, contentX + contentWidth / 2, currentY);
+      currentY -= lineHeight * 1.3;
     }
 
     // Localização
     if (thumbnailData.location) {
-      currentY = cardY + cardHeight - cardHeight * 0.15;
       ctx.fillStyle = thumbnailData.locationColor;
-      ctx.font = `${baseFontSize * thumbnailData.textFontSize * 0.9}px Inter, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`📍 ${thumbnailData.location}`, cardX + cardWidth / 2, currentY);
+      ctx.fillText(`📍 ${thumbnailData.location}`, contentX + contentWidth / 2, currentY);
+      currentY -= lineHeight * 1.8;
     }
 
-    // Código de referência
-    if (thumbnailData.referencia) {
-      currentY = cardY + cardHeight - cardHeight * 0.05;
-      ctx.fillStyle = thumbnailData.textColor;
-      ctx.font = `${baseFontSize * thumbnailData.textFontSize * 0.8}px Inter, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`REF: ${thumbnailData.referencia}`, cardX + cardWidth / 2, currentY);
+    // Caixa de preço (background azul)
+    if (thumbnailData.price) {
+      const priceBoxHeight = baseFontSize * thumbnailData.priceFontSize * 2.2;
+      const priceBoxY = currentY - priceBoxHeight;
+      const priceBoxPadding = contentWidth * 0.08;
+      
+      // Desabilitar shadow para o box
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      
+      // Box background
+      ctx.fillStyle = thumbnailData.priceColor;
+      const radius = 10;
+      ctx.beginPath();
+      ctx.moveTo(contentX + priceBoxPadding + radius, priceBoxY);
+      ctx.lineTo(contentX + contentWidth - priceBoxPadding - radius, priceBoxY);
+      ctx.quadraticCurveTo(contentX + contentWidth - priceBoxPadding, priceBoxY, contentX + contentWidth - priceBoxPadding, priceBoxY + radius);
+      ctx.lineTo(contentX + contentWidth - priceBoxPadding, priceBoxY + priceBoxHeight - radius);
+      ctx.quadraticCurveTo(contentX + contentWidth - priceBoxPadding, priceBoxY + priceBoxHeight, contentX + contentWidth - priceBoxPadding - radius, priceBoxY + priceBoxHeight);
+      ctx.lineTo(contentX + priceBoxPadding + radius, priceBoxY + priceBoxHeight);
+      ctx.quadraticCurveTo(contentX + priceBoxPadding, priceBoxY + priceBoxHeight, contentX + priceBoxPadding, priceBoxY + priceBoxHeight - radius);
+      ctx.lineTo(contentX + priceBoxPadding, priceBoxY + radius);
+      ctx.quadraticCurveTo(contentX + priceBoxPadding, priceBoxY, contentX + priceBoxPadding + radius, priceBoxY);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Box shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      
+      // Reativar text shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+      
+      // Preço
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 ${baseFontSize * thumbnailData.priceFontSize * 1.1}px Inter, Arial, sans-serif`;
+      ctx.fillText(thumbnailData.price, contentX + contentWidth / 2, priceBoxY + priceBoxHeight * 0.5);
+      
+      // Label do preço
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = `400 ${baseFontSize * thumbnailData.priceFontSize * 0.45}px Inter, Arial, sans-serif`;
+      ctx.fillText('Oportunidade Única!', contentX + contentWidth / 2, priceBoxY + priceBoxHeight * 0.82);
+      
+      currentY = priceBoxY - lineHeight * 0.8;
     }
+
+    // REF
+    if (thumbnailData.referencia) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.font = `500 ${baseFontSize * thumbnailData.textFontSize * 0.95}px Inter, Arial, sans-serif`;
+      ctx.fillText(`REF.: ${thumbnailData.referencia}`, contentX + contentWidth / 2, currentY);
+      currentY -= lineHeight * 1.2;
+    }
+
+    // Título
+    if (thumbnailData.title) {
+      ctx.fillStyle = thumbnailData.titleColor;
+      ctx.font = `700 ${baseFontSize * thumbnailData.titleFontSize * 1.1}px Inter, Arial, sans-serif`;
+      const titleUpper = thumbnailData.title.toUpperCase();
+      ctx.fillText(titleUpper, contentX + contentWidth / 2, currentY);
+    }
+
+    // Resetar shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   };
 
   const loadDrawable = async (mediaId: string) => {

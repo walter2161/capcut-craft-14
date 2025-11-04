@@ -121,132 +121,138 @@ export const ThumbnailEditor = () => {
       
       ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
-      // Overlay escuro
-      ctx.fillStyle = `rgba(0, 0, 0, ${formData.overlayOpacity})`;
+      // Gradient overlay (escuro embaixo, transparente em cima)
+      const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+      gradient.addColorStop(0, `rgba(0, 0, 0, ${formData.overlayOpacity * 0.55})`);
+      gradient.addColorStop(0.5, `rgba(0, 0, 0, ${formData.overlayOpacity * 0.15})`);
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Card centralizado em área 1:1
+      // Área 1x1 centralizada (65% de largura)
       const squareSize = Math.min(canvas.width, canvas.height);
-      const squareX = (canvas.width - squareSize) / 2;
-      const squareY = (canvas.height - squareSize) / 2;
-      const cardPadding = squareSize * formData.cardPadding;
-      const cardX = squareX + cardPadding;
-      const cardY = squareY + cardPadding;
-      const cardWidth = squareSize - (cardPadding * 2);
-      const cardHeight = squareSize - (cardPadding * 2);
-
-      // Converter hex para rgba
-      const hexToRgba = (hex: string, opacity: number) => {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-      };
-
-      // Fundo do card
-      ctx.fillStyle = hexToRgba(formData.cardBgColor, formData.cardBgOpacity);
+      const areaWidth = squareSize * 0.65;
+      const areaHeight = areaWidth;
+      const areaX = (canvas.width - areaWidth) / 2;
+      const areaY = (canvas.height - areaHeight) / 2;
       
-      if (formData.borderRadius > 0) {
-        const radius = formData.borderRadius;
+      const padding = areaWidth * 0.05;
+      const contentX = areaX + padding;
+      const contentY = areaY + areaHeight - padding;
+      const contentWidth = areaWidth - (padding * 2);
+
+      // Configurar text shadow para todos os textos
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 3;
+
+      const baseFontSize = areaWidth * 0.055;
+      const lineHeight = baseFontSize * 1.2;
+      let currentY = contentY;
+
+      // Detalhes (de baixo para cima)
+      ctx.font = `600 ${baseFontSize * formData.textFontSize}px Arial`;
+      ctx.textAlign = 'center';
+
+      // Área
+      if (formData.area) {
+        ctx.fillStyle = formData.textColor;
+        ctx.fillText(`📐 ${formData.area}m² Área Útil`, contentX + contentWidth / 2, currentY);
+        currentY -= lineHeight * 1.3;
+      }
+
+      // Banheiros
+      if (formData.bathrooms) {
+        ctx.fillStyle = formData.textColor;
+        ctx.fillText(`🚿 ${formData.bathrooms} Banheiro${formData.bathrooms !== '1' ? 's' : ''}`, contentX + contentWidth / 2, currentY);
+        currentY -= lineHeight * 1.3;
+      }
+
+      // Quartos
+      if (formData.bedrooms) {
+        ctx.fillStyle = formData.textColor;
+        ctx.fillText(`🛏️ ${formData.bedrooms} Quarto${formData.bedrooms !== '1' ? 's' : ''}`, contentX + contentWidth / 2, currentY);
+        currentY -= lineHeight * 1.3;
+      }
+
+      // Localização
+      if (formData.location) {
+        ctx.fillStyle = formData.locationColor;
+        ctx.fillText(`📍 ${formData.location}`, contentX + contentWidth / 2, currentY);
+        currentY -= lineHeight * 1.8;
+      }
+
+      // Caixa de preço (background azul)
+      if (formData.price) {
+        const priceBoxHeight = baseFontSize * formData.priceFontSize * 2.2;
+        const priceBoxY = currentY - priceBoxHeight;
+        const priceBoxPadding = contentWidth * 0.08;
+        
+        // Desabilitar shadow para o box
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        
+        // Box background
+        ctx.fillStyle = formData.priceColor;
+        const radius = 10;
         ctx.beginPath();
-        ctx.moveTo(cardX + radius, cardY);
-        ctx.lineTo(cardX + cardWidth - radius, cardY);
-        ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
-        ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
-        ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
-        ctx.lineTo(cardX + radius, cardY + cardHeight);
-        ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
-        ctx.lineTo(cardX, cardY + radius);
-        ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
+        ctx.moveTo(contentX + priceBoxPadding + radius, priceBoxY);
+        ctx.lineTo(contentX + contentWidth - priceBoxPadding - radius, priceBoxY);
+        ctx.quadraticCurveTo(contentX + contentWidth - priceBoxPadding, priceBoxY, contentX + contentWidth - priceBoxPadding, priceBoxY + radius);
+        ctx.lineTo(contentX + contentWidth - priceBoxPadding, priceBoxY + priceBoxHeight - radius);
+        ctx.quadraticCurveTo(contentX + contentWidth - priceBoxPadding, priceBoxY + priceBoxHeight, contentX + contentWidth - priceBoxPadding - radius, priceBoxY + priceBoxHeight);
+        ctx.lineTo(contentX + priceBoxPadding + radius, priceBoxY + priceBoxHeight);
+        ctx.quadraticCurveTo(contentX + priceBoxPadding, priceBoxY + priceBoxHeight, contentX + priceBoxPadding, priceBoxY + priceBoxHeight - radius);
+        ctx.lineTo(contentX + priceBoxPadding, priceBoxY + radius);
+        ctx.quadraticCurveTo(contentX + priceBoxPadding, priceBoxY, contentX + priceBoxPadding + radius, priceBoxY);
         ctx.closePath();
         ctx.fill();
-      } else {
-        ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+        
+        // Box shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        
+        // Reativar text shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        
+        // Preço
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `900 ${baseFontSize * formData.priceFontSize * 1.1}px Arial`;
+        ctx.fillText(formData.price, contentX + contentWidth / 2, priceBoxY + priceBoxHeight * 0.5);
+        
+        // Label do preço
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = `400 ${baseFontSize * formData.priceFontSize * 0.45}px Arial`;
+        ctx.fillText('Oportunidade Única!', contentX + contentWidth / 2, priceBoxY + priceBoxHeight * 0.82);
+        
+        currentY = priceBoxY - lineHeight * 0.8;
       }
 
-      // Borda do card
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.lineWidth = 2;
-      if (formData.borderRadius > 0) {
-        const radius = formData.borderRadius;
-        ctx.beginPath();
-        ctx.moveTo(cardX + radius, cardY);
-        ctx.lineTo(cardX + cardWidth - radius, cardY);
-        ctx.quadraticCurveTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + radius);
-        ctx.lineTo(cardX + cardWidth, cardY + cardHeight - radius);
-        ctx.quadraticCurveTo(cardX + cardWidth, cardY + cardHeight, cardX + cardWidth - radius, cardY + cardHeight);
-        ctx.lineTo(cardX + radius, cardY + cardHeight);
-        ctx.quadraticCurveTo(cardX, cardY + cardHeight, cardX, cardY + cardHeight - radius);
-        ctx.lineTo(cardX, cardY + radius);
-        ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
-        ctx.closePath();
-        ctx.stroke();
-      } else {
-        ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+      // REF
+      if (formData.referencia) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.font = `500 ${baseFontSize * formData.textFontSize * 0.95}px Arial`;
+        ctx.fillText(`REF.: ${formData.referencia}`, contentX + contentWidth / 2, currentY);
+        currentY -= lineHeight * 1.2;
       }
-
-      // Renderizar textos
-      const baseFontSize = squareSize * 0.05;
-      const lineHeight = baseFontSize * 1.5;
-      let currentY = cardY + cardHeight * 0.15;
 
       // Título
       if (formData.title) {
         ctx.fillStyle = formData.titleColor;
-        ctx.font = `bold ${baseFontSize * formData.titleFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText(formData.title, cardX + cardWidth / 2, currentY);
-        currentY += lineHeight * 2;
+        ctx.font = `700 ${baseFontSize * formData.titleFontSize * 1.1}px Arial`;
+        const titleUpper = formData.title.toUpperCase();
+        ctx.fillText(titleUpper, contentX + contentWidth / 2, currentY);
       }
 
-      // Preço
-      if (formData.price) {
-        ctx.fillStyle = formData.priceColor;
-        ctx.font = `bold ${baseFontSize * formData.priceFontSize}px Arial`;
-        ctx.fillText(formData.price, cardX + cardWidth / 2, currentY);
-        currentY += lineHeight * 2.5;
-      }
-
-      // Características em grid
-      const startY = currentY;
-      ctx.font = `${baseFontSize * formData.textFontSize}px Arial`;
-
-      if (formData.bedrooms) {
-        const x = cardX + cardWidth * 0.25;
-        ctx.fillStyle = formData.textColor;
-        ctx.fillText('🛏️', x, startY);
-        ctx.fillText(`${formData.bedrooms} quartos`, x, startY + lineHeight);
-      }
-
-      if (formData.bathrooms) {
-        const x = cardX + cardWidth * 0.75;
-        ctx.fillStyle = formData.textColor;
-        ctx.fillText('🚿', x, startY);
-        ctx.fillText(`${formData.bathrooms} banheiros`, x, startY + lineHeight);
-      }
-
-      currentY += lineHeight * 3;
-
-      if (formData.area) {
-        ctx.fillStyle = formData.textColor;
-        ctx.fillText(`📐 ${formData.area} m²`, cardX + cardWidth / 2, currentY);
-      }
-
-      // Localização no rodapé
-      if (formData.location) {
-        currentY = cardY + cardHeight - cardHeight * 0.15;
-        ctx.fillStyle = formData.locationColor;
-        ctx.font = `${baseFontSize * formData.textFontSize * 0.9}px Arial`;
-        ctx.fillText(`📍 ${formData.location}`, cardX + cardWidth / 2, currentY);
-      }
-
-      // Código de referência
-      if (formData.referencia) {
-        currentY = cardY + cardHeight - cardHeight * 0.05;
-        ctx.fillStyle = formData.textColor;
-        ctx.font = `${baseFontSize * formData.textFontSize * 0.8}px Arial`;
-        ctx.fillText(`REF: ${formData.referencia}`, cardX + cardWidth / 2, currentY);
-      }
+      // Resetar shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
     };
 
     // Lidar com diferentes tipos de dados de imagem
