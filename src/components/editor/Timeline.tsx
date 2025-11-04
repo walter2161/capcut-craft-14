@@ -161,6 +161,7 @@ export const Timeline = () => {
 
   const handlePlayheadMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     playheadDragRef.current = true;
     setIsPlaying(false);
   };
@@ -168,10 +169,10 @@ export const Timeline = () => {
   const handlePlayheadMouseMove = (e: MouseEvent) => {
     if (!playheadDragRef.current) return;
     
-    const container = document.querySelector('.tracks-container');
-    if (!container) return;
+    const scrollArea = document.querySelector('.tracks-container');
+    if (!scrollArea) return;
     
-    const rect = container.getBoundingClientRect();
+    const rect = scrollArea.getBoundingClientRect();
     const offsetX = e.clientX - rect.left - 112;
     const newTime = Math.max(0, Math.min(totalDuration, offsetX * MS_PER_PIXEL));
     setCurrentTime(newTime);
@@ -519,13 +520,13 @@ export const Timeline = () => {
 
         {/* Playhead - Fixo fora do ScrollArea */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-20 cursor-col-resize pointer-events-none"
+          className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-50 pointer-events-none"
           style={{
             left: `${112 + currentTime / MS_PER_PIXEL}px`,
           }}
         >
           <div 
-            className="w-3 h-3 bg-[hsl(var(--playhead))] rounded-full -ml-1.5 -mt-1 cursor-grab active:cursor-grabbing pointer-events-auto"
+            className="w-4 h-4 bg-[hsl(var(--playhead))] rounded-full -ml-2 -mt-1 cursor-grab active:cursor-grabbing pointer-events-auto shadow-lg border-2 border-background hover:scale-110 transition-transform"
             onMouseDown={handlePlayheadMouseDown}
           />
         </div>

@@ -27,6 +27,7 @@ export interface Clip {
   transitionDuration?: number;
   text?: string; // Texto da legenda
   readingSpeed?: number; // Velocidade de leitura (palavras por minuto)
+  trimStart?: number; // Offset de onde começar a reproduzir o arquivo (em ms)
 }
 
 export interface TrackState {
@@ -149,17 +150,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return state;
     }
     
+    const originalTrimStart = clipToSplit.trimStart || 0;
+    const splitOffset = splitTime - clipToSplit.start;
+    
     const firstPart = {
       ...clipToSplit,
       id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}-1`,
-      duration: splitTime - clipToSplit.start
+      duration: splitOffset,
+      trimStart: originalTrimStart
     };
     
     const secondPart = {
       ...clipToSplit,
       id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}-2`,
       start: splitTime,
-      duration: (clipToSplit.start + clipToSplit.duration) - splitTime
+      duration: (clipToSplit.start + clipToSplit.duration) - splitTime,
+      trimStart: originalTrimStart + splitOffset
     };
     
     const newClips = state.clips
