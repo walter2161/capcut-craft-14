@@ -159,7 +159,14 @@ export const ExportVideoDialog = () => {
     });
   };
 
+  // Função de easing para transições suaves
+  const easeInOutCubic = (t: number): number => {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  };
+
   const renderFrame = async (ctx: CanvasRenderingContext2D, time: number, canvas: HTMLCanvasElement) => {
+    // Limpar canvas completamente
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -173,49 +180,87 @@ export const ExportVideoDialog = () => {
     const timeInClip = time - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
 
-    // Desenhar próximo clipe ao fundo para cross-fade
-    const currentIndex = videoClips.indexOf(currentClip);
-    const nextClip = currentIndex < videoClips.length - 1 ? videoClips[currentIndex + 1] : null;
-    let alpha = currentClip.opacity;
-    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
-      const transitionStart = currentClip.duration - transitionDuration;
-      if (timeInClip >= transitionStart) {
-        const transitionTime = timeInClip - transitionStart;
-        const transitionProgress = Math.min(1, Math.max(0, transitionTime / transitionDuration));
-        const nextMedia = await loadDrawable(nextClip.mediaId);
-        if (nextMedia) {
-          const nextProps = fitImageToCanvas(nextMedia, canvas);
-          ctx.filter = 'none';
-          ctx.globalAlpha = 1;
-          const nextScaledW = nextProps.drawWidth * nextClip.scale;
-          const nextScaledH = nextProps.drawHeight * nextClip.scale;
-          const nextX = (canvas.width - nextScaledW) / 2;
-          const nextY = (canvas.height - nextScaledH) / 2;
-          ctx.drawImage(nextMedia as any, nextX, nextY, nextScaledW, nextScaledH);
-        }
-        alpha = (1 - transitionProgress) * currentClip.opacity;
-      }
-    }
-
     // Vídeo: sincronizar tempo antes de desenhar
     if (media instanceof HTMLVideoElement) {
       const videoTime = (timeInClip / 1000) * currentClip.speed;
-      if (Math.abs(media.currentTime - videoTime) > 0.05) {
+      if (Math.abs(media.currentTime - videoTime) > 0.1) {
         await seekVideo(media, Math.max(0, Math.min(videoTime, media.duration || 0)));
+      }
+      // Aguardar um frame adicional para garantir que o vídeo está pronto
+      if (media.readyState < 2) {
+        await new Promise(resolve => setTimeout(resolve, 16));
       }
       if (media.readyState < 2) return;
     }
 
+    // Calcular transição
+    const currentIndex = videoClips.indexOf(currentClip);
+    const nextClip = currentIndex < videoClips.length - 1 ? videoClips[currentIndex + 1] : null;
+    let currentAlpha = currentClip.opacity;
+    let nextAlpha = 0;
+    let shouldDrawNext = false;
+
+    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
+      const transitionStart = currentClip.duration - transitionDuration;
+      if (timeInClip >= transitionStart) {
+        const transitionTime = timeInClip - transitionStart;
+        const rawProgress = Math.min(1, Math.max(0, transitionTime / transitionDuration));
+        const transitionProgress = easeInOutCubic(rawProgress);
+        
+        currentAlpha = (1 - transitionProgress) * currentClip.opacity;
+        nextAlpha = transitionProgress;
+        shouldDrawNext = true;
+      }
+    }
+
+    // Reset de estados do contexto
+    ctx.save();
+
+    // Desenhar próximo clipe ao fundo (se em transição)
+    if (shouldDrawNext && nextClip) {
+      const nextMedia = await loadDrawable(nextClip.mediaId);
+      if (nextMedia) {
+        // Sincronizar vídeo do próximo clipe se necessário
+        if (nextMedia instanceof HTMLVideoElement) {
+          const nextVideoTime = 0; // Começa do início do próximo clipe
+          if (Math.abs(nextMedia.currentTime - nextVideoTime) > 0.1) {
+            await seekVideo(nextMedia, nextVideoTime);
+          }
+          if (nextMedia.readyState >= 2) {
+            const nextProps = fitImageToCanvas(nextMedia, canvas);
+            ctx.globalAlpha = nextAlpha;
+            ctx.filter = `brightness(${100 + nextClip.brightness}%) contrast(${100 + nextClip.contrast}%)`;
+            const nextScaledW = nextProps.drawWidth * nextClip.scale;
+            const nextScaledH = nextProps.drawHeight * nextClip.scale;
+            const nextX = (canvas.width - nextScaledW) / 2;
+            const nextY = (canvas.height - nextScaledH) / 2;
+            ctx.drawImage(nextMedia, nextX, nextY, nextScaledW, nextScaledH);
+          }
+        } else {
+          // Imagem
+          const nextProps = fitImageToCanvas(nextMedia, canvas);
+          ctx.globalAlpha = nextAlpha;
+          ctx.filter = `brightness(${100 + nextClip.brightness}%) contrast(${100 + nextClip.contrast}%)`;
+          const nextScaledW = nextProps.drawWidth * nextClip.scale;
+          const nextScaledH = nextProps.drawHeight * nextClip.scale;
+          const nextX = (canvas.width - nextScaledW) / 2;
+          const nextY = (canvas.height - nextScaledH) / 2;
+          ctx.drawImage(nextMedia, nextX, nextY, nextScaledW, nextScaledH);
+        }
+      }
+    }
+
+    // Desenhar clipe atual por cima
     const props = fitImageToCanvas(media, canvas);
+    ctx.globalAlpha = currentAlpha;
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
-    ctx.globalAlpha = alpha;
     const scaledW = props.drawWidth * currentClip.scale;
     const scaledH = props.drawHeight * currentClip.scale;
     const x = (canvas.width - scaledW) / 2;
     const y = (canvas.height - scaledH) / 2;
-    ctx.drawImage(media as any, x, y, scaledW, scaledH);
-    ctx.filter = 'none';
-    ctx.globalAlpha = 1;
+    ctx.drawImage(media, x, y, scaledW, scaledH);
+
+    ctx.restore();
 
     // Renderizar legendas
     const subtitleClips = clips.filter(c => c.type === 'subtitle');
@@ -538,39 +583,62 @@ export const ExportVideoDialog = () => {
         }
       });
       
-      // Renderizar frames
+      // Renderizar frames com timing preciso
       const frameIntervalMs = 1000 / fps;
       const startTimestamp = performance.now();
       let frameCount = 0;
-      const playedAudios = new Set<string>();
+      const totalFrames = Math.ceil((durationMs / 1000) * fps);
 
       await new Promise<void>((resolve) => {
-        const recordingLoop = setInterval(() => {
-          const virtualTimestamp = performance.now() - startTimestamp;
-          const currentTimeSeconds = virtualTimestamp / 1000;
+        const renderNextFrame = async () => {
+          const virtualTimestamp = frameCount * frameIntervalMs;
           
-          // Áudio já pré-agendado acima
-          // Renderizar frame
-          renderFrame(ctx, virtualTimestamp, exportCanvas);
-          
-          // Atualizar progresso
-          const progress = Math.min(100, (virtualTimestamp / durationMs) * 100);
-          setExportProgress(Math.round(progress));
-          frameCount++;
-          
-          // Verificar se concluiu
-          if (virtualTimestamp >= durationMs) {
-            clearInterval(recordingLoop);
-            
+          if (virtualTimestamp >= durationMs || frameCount >= totalFrames) {
             // Pequeno delay para garantir captura do último frame e áudio
             setTimeout(() => {
               mediaRecorder.stop();
               combinedStream.getTracks().forEach(t => t.stop());
               audioContext.close();
               resolve();
-            }, 500);
+            }, 300);
+            return;
           }
-        }, frameIntervalMs);
+          
+          try {
+            // Renderizar frame de forma assíncrona
+            await renderFrame(ctx, virtualTimestamp, exportCanvas);
+            
+            // Atualizar progresso
+            const progress = Math.min(95, (frameCount / totalFrames) * 95);
+            setExportProgress(Math.round(progress));
+            frameCount++;
+            
+            // Calcular timing para próximo frame
+            const elapsedTime = performance.now() - startTimestamp;
+            const expectedTime = frameCount * frameIntervalMs;
+            const drift = expectedTime - elapsedTime;
+            
+            // Compensar drift com delay ajustado
+            const delay = Math.max(0, frameIntervalMs + drift);
+            
+            setTimeout(() => {
+              requestAnimationFrame(renderNextFrame);
+            }, delay);
+          } catch (error) {
+            console.error('Erro ao renderizar frame:', error);
+            setTimeout(() => {
+              mediaRecorder.stop();
+              combinedStream.getTracks().forEach(t => t.stop());
+              audioContext.close();
+              resolve();
+            }, 100);
+          }
+        };
+        
+        // Iniciar renderização após um pequeno delay
+        setTimeout(() => {
+          requestAnimationFrame(renderNextFrame);
+        }, 100);
       });
 
       await stopped;
