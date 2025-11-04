@@ -29,6 +29,12 @@ export interface Clip {
   readingSpeed?: number; // Velocidade de leitura (palavras por minuto)
 }
 
+export interface TrackState {
+  name: string;
+  muted: boolean;
+  hidden: boolean;
+}
+
 export interface GlobalSettings {
   defaultImageDuration: number;
   defaultTransitionDuration: number;
@@ -47,6 +53,7 @@ interface EditorState {
   totalDuration: number;
   globalSettings: GlobalSettings;
   projectName: string;
+  trackStates: TrackState[];
   
   addMediaItem: (item: MediaItem) => void;
   removeMediaItem: (id: string) => void;
@@ -65,6 +72,9 @@ interface EditorState {
   loadProject: (data: any) => void;
   resetProject: () => void;
   clearTimelineAndMedia: () => void;
+  toggleTrackMute: (trackName: string) => void;
+  toggleTrackVisibility: (trackName: string) => void;
+  addTrackState: (trackName: string) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -83,6 +93,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     mediaFitMode: 'fit-height',
   },
   projectName: 'Post Imóvel 9:16',
+  trackStates: [
+    { name: 'SUB1', muted: false, hidden: false },
+    { name: 'V1', muted: false, hidden: false },
+    { name: 'A1', muted: false, hidden: false },
+  ],
 
   addMediaItem: (item) => set((state) => ({ 
     mediaItems: [...state.mediaItems, item] 
@@ -231,4 +246,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     currentTime: 0,
     totalDuration: 0,
   }),
+
+  toggleTrackMute: (trackName) => set((state) => ({
+    trackStates: state.trackStates.map(track => 
+      track.name === trackName ? { ...track, muted: !track.muted } : track
+    )
+  })),
+
+  toggleTrackVisibility: (trackName) => set((state) => ({
+    trackStates: state.trackStates.map(track => 
+      track.name === trackName ? { ...track, hidden: !track.hidden } : track
+    )
+  })),
+
+  addTrackState: (trackName) => set((state) => ({
+    trackStates: [...state.trackStates, { name: trackName, muted: false, hidden: false }]
+  })),
 }));

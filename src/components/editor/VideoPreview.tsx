@@ -10,7 +10,7 @@ export const VideoPreview = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const { clips, mediaItems, currentTime, isPlaying, globalSettings } = useEditorStore();
+  const { clips, mediaItems, currentTime, isPlaying, globalSettings, trackStates } = useEditorStore();
   const [zoom, setZoom] = useState(1);
   const [, forceRerender] = useState(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
@@ -94,14 +94,18 @@ export const VideoPreview = () => {
       c => c.start <= time && c.start + c.duration > time
     );
 
-    // Se mudou de clip ou não há clip, parar áudio atual
+    // Verificar se o track está mutado
+    const trackState = trackStates.find(t => t.name === currentAudioClip?.track);
+    const isMuted = trackState?.muted || false;
+
+    // Se mudou de clip ou não há clip ou está mutado, parar áudio atual
     const clipId = currentAudioClip?.id || null;
-    if (clipId !== currentAudioClipRef.current) {
+    if (clipId !== currentAudioClipRef.current || isMuted) {
       stopAudio();
       currentAudioClipRef.current = clipId;
     }
 
-    if (!currentAudioClip) {
+    if (!currentAudioClip || isMuted) {
       return;
     }
 
@@ -183,11 +187,16 @@ export const VideoPreview = () => {
       c => c.start <= time && c.start + c.duration > time
     );
 
-    if (currentClip && currentClip.text) {
+    // Verificar se o track está mutado ou oculto
+    const trackState = trackStates.find(t => t.name === currentClip?.track);
+    const isMuted = trackState?.muted || false;
+    const isHidden = trackState?.hidden || false;
+
+    if (currentClip && currentClip.text && !isHidden) {
       setCurrentSubtitle(currentClip.text);
       
-      // Reproduzir voz apenas se for uma nova legenda
-      if (lastSpokenSubtitleRef.current !== currentClip.text) {
+      // Reproduzir voz apenas se for uma nova legenda e não estiver mutado
+      if (lastSpokenSubtitleRef.current !== currentClip.text && !isMuted) {
         speakText(currentClip.text);
         lastSpokenSubtitleRef.current = currentClip.text;
       }
@@ -279,6 +288,10 @@ export const VideoPreview = () => {
     );
 
     if (!currentClip) return;
+
+    // Verificar se o track está oculto
+    const trackState = trackStates.find(t => t.name === currentClip.track);
+    if (trackState?.hidden) return;
 
     const mediaItem = mediaItems.find(m => m.id === currentClip.mediaId);
     if (!mediaItem || !mediaItem.data) {

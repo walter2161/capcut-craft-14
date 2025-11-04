@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Scissors, Plus, Copy, Trash2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Scissors, Plus, Copy, Trash2, Volume2, VolumeX, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useEditorStore } from "@/store/editorStore";
 import { GlobalSettingsDialog } from "./GlobalSettingsDialog";
 
@@ -21,7 +21,11 @@ export const Timeline = () => {
     updateTotalDuration,
     removeClip,
     duplicateClip,
-    splitClip
+    splitClip,
+    trackStates,
+    toggleTrackMute,
+    toggleTrackVisibility,
+    addTrackState
   } = useEditorStore();
 
   const [tracks, setTracks] = useState(['SUB1', 'V1', 'A1']);
@@ -79,7 +83,7 @@ export const Timeline = () => {
       if (!clip) return;
       
       const rect = e.currentTarget.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left - 80 - dragOffsetRef.current;
+      const offsetX = e.clientX - rect.left - 112 - dragOffsetRef.current;
       let dropTime = Math.max(0, offsetX * MS_PER_PIXEL);
       
       // Snap magnético: colar em outros clipes próximos
@@ -122,7 +126,7 @@ export const Timeline = () => {
     if (!mediaItem) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left - 80;
+    const offsetX = e.clientX - rect.left - 112;
     const dropTime = Math.max(0, offsetX * MS_PER_PIXEL);
 
     addClipFromDrop(mediaItem, track, dropTime);
@@ -168,7 +172,7 @@ export const Timeline = () => {
     if (!container) return;
     
     const rect = container.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left - 80;
+    const offsetX = e.clientX - rect.left - 112;
     const newTime = Math.max(0, Math.min(totalDuration, offsetX * MS_PER_PIXEL));
     setCurrentTime(newTime);
   };
@@ -273,7 +277,7 @@ export const Timeline = () => {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+            onClick={() => setZoom(Math.max(0.05, zoom - 0.25))}
             className="h-6 w-6 p-0 hover:bg-muted"
           >
             -
@@ -282,7 +286,7 @@ export const Timeline = () => {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setZoom(Math.min(3, zoom + 0.25))}
+            onClick={() => setZoom(Math.min(5, zoom + 0.25))}
             className="h-6 w-6 p-0 hover:bg-muted"
           >
             +
@@ -339,12 +343,14 @@ export const Timeline = () => {
       </div>
 
       <div className="flex-1 relative overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="overflow-x-auto relative tracks-container">
+        <ScrollArea className="h-full w-full">
+          <div className="relative tracks-container" style={{ minWidth: `${Math.max(1200, totalDuration / MS_PER_PIXEL + 100)}px` }}>
             {tracks.map((trackName, idx) => {
             const trackClips = clips.filter(c => c.track === trackName);
+            const trackState = trackStates.find(t => t.name === trackName) || { muted: false, hidden: false };
             const isVideoTrack = trackName.startsWith('V');
             const isSubtitleTrack = trackName.startsWith('SUB');
+            const isAudioTrack = trackName.startsWith('A');
             
             return (
               <div 
@@ -353,10 +359,40 @@ export const Timeline = () => {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleTrackDrop(e, trackName)}
               >
-                <div className="w-20 min-w-20 flex items-center justify-center font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
-                  {trackName}
+                <div className="w-28 min-w-28 flex items-center justify-between px-2 font-semibold bg-[hsl(var(--timeline-bg))] border-r border-border">
+                  <span className="text-xs">{trackName}</span>
+                  <div className="flex gap-1">
+                    {(isAudioTrack || isSubtitleTrack) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleTrackMute(trackName)}
+                        className="h-5 w-5 p-0 hover:bg-muted"
+                        title={trackState.muted ? "Ativar som" : "Mutar"}
+                      >
+                        {trackState.muted ? (
+                          <VolumeX className="w-3 h-3 text-muted-foreground" />
+                        ) : (
+                          <Volume2 className="w-3 h-3" />
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleTrackVisibility(trackName)}
+                      className="h-5 w-5 p-0 hover:bg-muted"
+                      title={trackState.hidden ? "Mostrar" : "Ocultar"}
+                    >
+                      {trackState.hidden ? (
+                        <EyeOff className="w-3 h-3 text-muted-foreground" />
+                      ) : (
+                        <Eye className="w-3 h-3" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 relative" style={{ minWidth: `${Math.max(1200, totalDuration / MS_PER_PIXEL + 100)}px` }}>
+                <div className="flex-1 relative">
                   {trackClips.map(clip => {
                     const mediaItem = mediaItems.find(m => m.id === clip.mediaId);
                     return (
@@ -432,21 +468,27 @@ export const Timeline = () => {
               onClick={() => {
                 const nextVideoNum = tracks.filter(t => t.startsWith('V')).length + 1;
                 const nextAudioNum = tracks.filter(t => t.startsWith('A')).length + 1;
-                setTracks([...tracks, `V${nextVideoNum}`, `A${nextAudioNum}`]);
+                const newVideoTrack = `V${nextVideoNum}`;
+                const newAudioTrack = `A${nextAudioNum}`;
+                setTracks([...tracks, newVideoTrack, newAudioTrack]);
+                addTrackState(newVideoTrack);
+                addTrackState(newAudioTrack);
               }}
-              className="ml-20 my-2 text-xs"
+              className="ml-28 my-2 text-xs"
             >
               <Plus className="w-3 h-3 mr-1" />
               Adicionar Track
             </Button>
           </div>
+          <ScrollBar orientation="horizontal" />
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
 
         {/* Playhead - Fixo fora do ScrollArea */}
         <div
           className="absolute top-0 bottom-0 w-0.5 bg-[hsl(var(--playhead))] z-20 cursor-col-resize pointer-events-none"
           style={{
-            left: `${80 + currentTime / MS_PER_PIXEL}px`,
+            left: `${112 + currentTime / MS_PER_PIXEL}px`,
           }}
         >
           <div 

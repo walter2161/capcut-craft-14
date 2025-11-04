@@ -16,7 +16,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
 
 export const ExportVideoDialog = () => {
-  const { clips, mediaItems, globalSettings, totalDuration, projectName, setCurrentTime, setIsPlaying, isPlaying, currentTime } = useEditorStore();
+  const { clips, mediaItems, globalSettings, totalDuration, projectName, setCurrentTime, setIsPlaying, isPlaying, currentTime, trackStates } = useEditorStore();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -174,6 +174,10 @@ export const ExportVideoDialog = () => {
     const currentClip = videoClips.find(c => c.start <= time && c.start + c.duration > time);
     if (!currentClip) return;
 
+    // Verificar se o track está oculto
+    const trackState = trackStates.find(t => t.name === currentClip.track);
+    if (trackState?.hidden) return;
+
     const media = await loadDrawable(currentClip.mediaId);
     if (!media) return;
 
@@ -262,59 +266,62 @@ export const ExportVideoDialog = () => {
 
     ctx.restore();
 
-    // Renderizar legendas
+    // Renderizar legendas (respeitando hidden)
     const subtitleClips = clips.filter(c => c.type === 'subtitle');
     const currentSubtitle = subtitleClips.find(
       c => c.start <= time && c.start + c.duration > time
     );
 
     if (currentSubtitle && currentSubtitle.text) {
-      // Configurar estilo do texto
-      const fontSize = Math.floor(canvas.height * 0.04); // 4% da altura do canvas
-      ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
+      const trackState = trackStates.find(t => t.name === currentSubtitle.track);
+      if (!trackState?.hidden) {
+        // Configurar estilo do texto
+        const fontSize = Math.floor(canvas.height * 0.04); // 4% da altura do canvas
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
       
-      const text = currentSubtitle.text;
-      const maxWidth = canvas.width * 0.9;
-      const lineHeight = fontSize * 1.2;
-      
-      // Quebrar texto em múltiplas linhas se necessário
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let currentLine = '';
-      
-      words.forEach(word => {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const metrics = ctx.measureText(testLine);
+        const text = currentSubtitle.text;
+        const maxWidth = canvas.width * 0.9;
+        const lineHeight = fontSize * 1.2;
         
-        if (metrics.width > maxWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      });
-      if (currentLine) lines.push(currentLine);
-      
-      // Desenhar fundo semi-transparente
-      const padding = fontSize * 0.6;
-      const totalHeight = lines.length * lineHeight + padding * 2;
-      const bgY = canvas.height - fontSize * 2 - totalHeight;
-      
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillRect(0, bgY, canvas.width, totalHeight);
-      
-      // Desenhar texto com contorno
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-      ctx.lineWidth = fontSize * 0.15;
-      ctx.fillStyle = '#FFFFFF';
-      
-      lines.forEach((line, index) => {
-        const textY = bgY + padding + (index + 1) * lineHeight;
-        ctx.strokeText(line, canvas.width / 2, textY);
-        ctx.fillText(line, canvas.width / 2, textY);
-      });
+        // Quebrar texto em múltiplas linhas se necessário
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let currentLine = '';
+        
+        words.forEach(word => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const metrics = ctx.measureText(testLine);
+          
+          if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+        
+        // Desenhar fundo semi-transparente
+        const padding = fontSize * 0.6;
+        const totalHeight = lines.length * lineHeight + padding * 2;
+        const bgY = canvas.height - fontSize * 2 - totalHeight;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, bgY, canvas.width, totalHeight);
+        
+        // Desenhar texto com contorno
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.lineWidth = fontSize * 0.15;
+        ctx.fillStyle = '#FFFFFF';
+        
+        lines.forEach((line, index) => {
+          const textY = bgY + padding + (index + 1) * lineHeight;
+          ctx.strokeText(line, canvas.width / 2, textY);
+          ctx.fillText(line, canvas.width / 2, textY);
+        });
+      }
     }
   };
 
@@ -359,8 +366,11 @@ export const ExportVideoDialog = () => {
       const subtitleClips = clips.filter(c => c.type === 'subtitle').sort((a, b) => a.start - b.start);
       const audioBuffers: { start: number; buffer: AudioBuffer; duration: number; volume: number; speed: number }[] = [];
 
-      // Adicionar buffers de áudio dos clips de áudio
+      // Adicionar buffers de áudio dos clips de áudio (respeitando mute)
       for (const audioClip of audioClips) {
+        const trackState = trackStates.find(t => t.name === audioClip.track);
+        if (trackState?.muted) continue; // Pular se estiver mutado
+        
         const mediaItem = mediaItems.find(m => m.id === audioClip.mediaId);
         if (mediaItem && mediaItem.data instanceof AudioBuffer) {
           audioBuffers.push({
@@ -373,9 +383,10 @@ export const ExportVideoDialog = () => {
         }
       }
 
-      // Gerar áudio para cada legenda
+      // Gerar áudio para cada legenda (respeitando mute)
       for (const subtitle of subtitleClips) {
-        if (!subtitle.text) continue;
+        const trackState = trackStates.find(t => t.name === subtitle.track);
+        if (trackState?.muted || !subtitle.text) continue; // Pular se estiver mutado ou sem texto
         
         try {
           const utterance = new SpeechSynthesisUtterance(subtitle.text);
