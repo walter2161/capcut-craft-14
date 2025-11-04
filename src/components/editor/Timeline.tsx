@@ -23,7 +23,7 @@ export const Timeline = () => {
     splitClip
   } = useEditorStore();
 
-  const [tracks, setTracks] = useState(['V1', 'A1', 'SUB1']);
+  const [tracks, setTracks] = useState(['SUB1', 'V1', 'A1']);
   const [zoom, setZoom] = useState(1);
 
   const animationRef = useRef<number>();

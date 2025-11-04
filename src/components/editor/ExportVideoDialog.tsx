@@ -281,17 +281,65 @@ export const ExportVideoDialog = () => {
         toast.warning(`Algumas mídias não puderam ser preparadas (CORS): ${failed}`);
       }
 
+      // Criar AudioContext para capturar áudio das legendas
+      const audioContext = new AudioContext({ sampleRate: 48000 });
+      const audioDestination = audioContext.createMediaStreamDestination();
+
+      // Preparar sintetizador de voz
+      const subtitleClips = clips.filter(c => c.type === 'subtitle').sort((a, b) => a.start - b.start);
+      const audioBuffers: { start: number; buffer: AudioBuffer }[] = [];
+
+      // Gerar áudio para cada legenda
+      for (const subtitle of subtitleClips) {
+        if (!subtitle.text) continue;
+        
+        try {
+          const utterance = new SpeechSynthesisUtterance(subtitle.text);
+          utterance.lang = 'pt-BR';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          // Usar Web Speech API para gerar o áudio
+          await new Promise<void>((resolve) => {
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+            window.speechSynthesis.speak(utterance);
+          });
+
+          // Calcular a duração estimada do áudio baseado no texto
+          const words = subtitle.text.split(/\s+/).length;
+          const estimatedDuration = (words / 150) * 60; // 150 palavras por minuto
+          const buffer = audioContext.createBuffer(
+            2, 
+            Math.ceil(estimatedDuration * audioContext.sampleRate),
+            audioContext.sampleRate
+          );
+
+          audioBuffers.push({ start: subtitle.start / 1000, buffer });
+        } catch (error) {
+          console.warn('Erro ao gerar áudio da legenda:', error);
+        }
+      }
+
       // Capturar stream do canvas
-      const stream = exportCanvas.captureStream(fps);
+      const videoStream = exportCanvas.captureStream(fps);
       
-      // Configurar MediaRecorder
-      const candidateTypes = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'];
+      // Combinar streams de vídeo e áudio
+      const combinedStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...audioDestination.stream.getAudioTracks()
+      ]);
+      
+      // Configurar MediaRecorder com áudio e vídeo
+      const candidateTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
       const supported = (window as any).MediaRecorder?.isTypeSupported?.bind(window.MediaRecorder);
       const mimeType = supported ? candidateTypes.find(t => supported(t)) || 'video/webm' : 'video/webm';
       
-      const mediaRecorder = new MediaRecorder(stream, {
+      const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 5_000_000
+        videoBitsPerSecond: 5_000_000,
+        audioBitsPerSecond: 128_000
       });
 
       const chunks: Blob[] = [];
@@ -332,14 +380,30 @@ export const ExportVideoDialog = () => {
       // Iniciar gravação
       mediaRecorder.start();
       
-      // Renderizar frames usando setInterval (como no código de referência)
+      // Renderizar frames e reproduzir áudio
       const frameIntervalMs = 1000 / fps;
       const startTimestamp = performance.now();
       let frameCount = 0;
+      const playedSubtitles = new Set<string>();
 
       await new Promise<void>((resolve) => {
         const recordingLoop = setInterval(() => {
           const virtualTimestamp = performance.now() - startTimestamp;
+          const currentTimeSeconds = virtualTimestamp / 1000;
+          
+          // Reproduzir áudio das legendas no momento correto
+          for (const { start, buffer } of audioBuffers) {
+            if (start <= currentTimeSeconds && start + buffer.duration > currentTimeSeconds) {
+              const subtitleId = `${start}`;
+              if (!playedSubtitles.has(subtitleId)) {
+                playedSubtitles.add(subtitleId);
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioDestination);
+                source.start(audioContext.currentTime);
+              }
+            }
+          }
           
           // Renderizar frame
           renderFrame(ctx, virtualTimestamp, exportCanvas);
@@ -353,12 +417,13 @@ export const ExportVideoDialog = () => {
           if (virtualTimestamp >= durationMs) {
             clearInterval(recordingLoop);
             
-            // Pequeno delay para garantir captura do último frame
+            // Pequeno delay para garantir captura do último frame e áudio
             setTimeout(() => {
               mediaRecorder.stop();
-              stream.getTracks().forEach(t => t.stop());
+              combinedStream.getTracks().forEach(t => t.stop());
+              audioContext.close();
               resolve();
-            }, 200);
+            }, 500);
           }
         }, frameIntervalMs);
       });
