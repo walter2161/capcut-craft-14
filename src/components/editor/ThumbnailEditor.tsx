@@ -20,6 +20,7 @@ export const ThumbnailEditor = () => {
   const { thumbnailData, updateThumbnailData, clips, mediaItems, globalSettings } = useEditorStore();
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState(thumbnailData);
+  const [activeTab, setActiveTab] = useState('preview');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleSave = () => {
@@ -31,15 +32,29 @@ export const ThumbnailEditor = () => {
   const handleOpenChange = (open: boolean) => {
     if (open) {
       setFormData(thumbnailData);
+      setActiveTab('preview');
     }
     setIsOpen(open);
   };
 
+  // Obter dimensões do canvas baseado no formato
+  const getCanvasDimensions = () => {
+    switch (globalSettings.videoFormat) {
+      case '9:16':
+        return { width: 540, height: 960 };
+      case '1:1':
+        return { width: 600, height: 600 };
+      case '16:9':
+      default:
+        return { width: 960, height: 540 };
+    }
+  };
+
+  const canvasDimensions = getCanvasDimensions();
+
   // Renderizar preview da thumbnail
   useEffect(() => {
-    console.log('ThumbnailEditor useEffect', { isOpen, hasCanvas: !!canvasRef.current, enabled: formData.enabled, clipsCount: clips.length });
-    
-    if (!isOpen || !canvasRef.current || !formData.enabled) return;
+    if (!isOpen || !canvasRef.current || !formData.enabled || activeTab !== 'preview') return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -52,22 +67,20 @@ export const ThumbnailEditor = () => {
 
     // Pegar primeira imagem
     const firstImageClip = clips.find(c => c.type === 'image' && c.track.startsWith('V'));
-    console.log('First image clip:', firstImageClip);
     
     if (!firstImageClip) {
       ctx.fillStyle = '#666666';
-      ctx.font = '14px Arial';
+      ctx.font = '16px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Adicione uma imagem na timeline', canvas.width / 2, canvas.height / 2);
       return;
     }
 
     const mediaItem = mediaItems.find(m => m.id === firstImageClip.mediaId);
-    console.log('Media item:', mediaItem);
     
     if (!mediaItem) {
       ctx.fillStyle = '#666666';
-      ctx.font = '14px Arial';
+      ctx.font = '16px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Imagem não encontrada', canvas.width / 2, canvas.height / 2);
       return;
@@ -75,41 +88,56 @@ export const ThumbnailEditor = () => {
 
     const img = new Image();
     
-    img.onerror = (e) => {
-      console.error('Erro ao carregar imagem:', e);
-      ctx.fillStyle = '#ff0000';
-      ctx.font = '14px Arial';
+    img.onerror = () => {
+      ctx.fillStyle = '#ff6666';
+      ctx.font = '16px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Erro ao carregar imagem', canvas.width / 2, canvas.height / 2);
     };
     
     img.onload = () => {
-      console.log('Imagem carregada:', img.width, 'x', img.height);
-      
-      // Desenhar imagem de fundo
+      // Desenhar imagem de fundo (respeitando fit mode)
       const imgRatio = img.width / img.height;
-      const canvasRatio = canvas.width / canvas.height;
       
       let drawWidth, drawHeight, offsetX, offsetY;
+      
+      // Fit-height: preenche a altura e centraliza horizontalmente
       if (globalSettings.mediaFitMode === 'fit-height') {
         drawHeight = canvas.height;
         drawWidth = imgRatio * drawHeight;
         offsetX = (canvas.width - drawWidth) / 2;
         offsetY = 0;
-      } else {
+      } 
+      // Fit-width: preenche a largura e centraliza verticalmente
+      else if (globalSettings.mediaFitMode === 'fit-width') {
         drawWidth = canvas.width;
         drawHeight = drawWidth / imgRatio;
         offsetX = 0;
         offsetY = (canvas.height - drawHeight) / 2;
       }
+      // Contain: imagem inteira visível
+      else {
+        const canvasRatio = canvas.width / canvas.height;
+        if (imgRatio > canvasRatio) {
+          drawWidth = canvas.width;
+          drawHeight = drawWidth / imgRatio;
+          offsetX = 0;
+          offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+          drawHeight = canvas.height;
+          drawWidth = imgRatio * drawHeight;
+          offsetX = (canvas.width - drawWidth) / 2;
+          offsetY = 0;
+        }
+      }
       
       ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
-      // Overlay
+      // Overlay escuro
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Card centralizado
+      // Card centralizado em área 1:1
       const squareSize = Math.min(canvas.width, canvas.height);
       const squareX = (canvas.width - squareSize) / 2;
       const squareY = (canvas.height - squareSize) / 2;
@@ -119,19 +147,19 @@ export const ThumbnailEditor = () => {
       const cardWidth = squareSize - (cardPadding * 2);
       const cardHeight = squareSize - (cardPadding * 2);
 
-      // Fundo do card
+      // Fundo do card com gradiente
       const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
       gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
       gradient.addColorStop(1, 'rgba(240, 240, 240, 0.95)');
       ctx.fillStyle = gradient;
       ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
 
-      // Borda
+      // Borda do card
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.lineWidth = 2;
       ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
 
-      // Textos
+      // Renderizar textos
       const fontSize = squareSize * 0.05;
       const lineHeight = fontSize * 1.5;
       let currentY = cardY + cardHeight * 0.15;
@@ -153,7 +181,7 @@ export const ThumbnailEditor = () => {
         currentY += lineHeight * 2.5;
       }
 
-      // Características
+      // Características em grid
       const startY = currentY;
       ctx.font = `${fontSize}px Arial`;
 
@@ -178,7 +206,7 @@ export const ThumbnailEditor = () => {
         ctx.fillText(`📐 ${formData.area} m²`, cardX + cardWidth / 2, currentY);
       }
 
-      // Localização
+      // Localização no rodapé
       if (formData.location) {
         currentY = cardY + cardHeight - cardHeight * 0.15;
         ctx.fillStyle = '#666666';
@@ -189,30 +217,27 @@ export const ThumbnailEditor = () => {
 
     // Lidar com diferentes tipos de dados de imagem
     if (mediaItem.data instanceof HTMLImageElement) {
-      console.log('Tipo: HTMLImageElement');
-      img.src = mediaItem.data.src;
+      if (mediaItem.data.complete && mediaItem.data.naturalWidth > 0) {
+        img.src = mediaItem.data.src;
+      } else {
+        mediaItem.data.onload = () => {
+          img.src = mediaItem.data.src;
+        };
+      }
     } else if (typeof mediaItem.data === 'string') {
-      console.log('Tipo: string URL');
       img.src = mediaItem.data;
     } else if (mediaItem.data instanceof Blob || mediaItem.data instanceof File) {
-      console.log('Tipo: Blob/File');
       const url = URL.createObjectURL(mediaItem.data);
       img.onload = () => {
-        const originalOnload = img.onload;
-        if (typeof originalOnload === 'function') {
-          originalOnload.call(img);
+        if (img.onload) {
+          const handler = img.onload;
+          handler.call(img, new Event('load'));
         }
         URL.revokeObjectURL(url);
       };
       img.src = url;
-    } else {
-      console.error('Tipo de dados não suportado:', typeof mediaItem.data, mediaItem.data);
-      ctx.fillStyle = '#ff0000';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Formato de imagem não suportado', canvas.width / 2, canvas.height / 2);
     }
-  }, [isOpen, formData, clips, mediaItems, globalSettings]);
+  }, [isOpen, activeTab, formData, clips, mediaItems, globalSettings]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -235,7 +260,7 @@ export const ThumbnailEditor = () => {
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="preview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="preview">Preview</TabsTrigger>
             <TabsTrigger value="settings">Configurações</TabsTrigger>
@@ -254,12 +279,12 @@ export const ThumbnailEditor = () => {
             </div>
             
             {formData.enabled ? (
-              <div className="relative bg-black rounded-lg overflow-hidden">
+              <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center">
                 <canvas
                   ref={canvasRef}
-                  width={540}
-                  height={960}
-                  className="w-full h-auto"
+                  width={canvasDimensions.width}
+                  height={canvasDimensions.height}
+                  className="max-w-full h-auto"
                   style={{ maxHeight: '60vh' }}
                 />
               </div>
