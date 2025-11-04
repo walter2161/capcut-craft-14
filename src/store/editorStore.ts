@@ -112,7 +112,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     { name: 'A1', muted: false, hidden: false },
   ],
   thumbnailData: {
-    enabled: false,
+    enabled: true,
     title: '',
     price: '',
     bedrooms: '',
