@@ -354,7 +354,7 @@ export const ExportVideoDialog = () => {
         toast.warning(`Algumas mídias não puderam ser preparadas (CORS): ${failed}`);
       }
 
-      // Criar AudioContext para capturar áudio
+      // Criar AudioContext para capturar áudio com alta qualidade
       const audioContext = new AudioContext({ sampleRate: 48000 });
       await audioContext.resume();
       const audioDestination = audioContext.createMediaStreamDestination();
@@ -364,7 +364,7 @@ export const ExportVideoDialog = () => {
       
       // Preparar sintetizador de voz para legendas
       const subtitleClips = clips.filter(c => c.type === 'subtitle').sort((a, b) => a.start - b.start);
-      const audioBuffers: { start: number; buffer: AudioBuffer; duration: number; volume: number; speed: number }[] = [];
+      const audioBuffers: { start: number; buffer: AudioBuffer; duration: number; volume: number; speed: number; trimStart: number }[] = [];
 
       // Adicionar buffers de áudio dos clips de áudio (respeitando mute)
       for (const audioClip of audioClips) {
@@ -378,7 +378,8 @@ export const ExportVideoDialog = () => {
             buffer: mediaItem.data,
             duration: audioClip.duration / 1000,
             volume: audioClip.volume,
-            speed: audioClip.speed
+            speed: audioClip.speed,
+            trimStart: (audioClip.trimStart || 0) / 1000 // Converter para segundos
           });
         }
       }
@@ -416,7 +417,8 @@ export const ExportVideoDialog = () => {
             buffer,
             duration: estimatedDuration,
             volume: subtitle.volume || 1.0,
-            speed: 1.0
+            speed: 1.0,
+            trimStart: 0
           });
         } catch (error) {
           console.warn('Erro ao gerar áudio da legenda:', error);
@@ -453,7 +455,7 @@ export const ExportVideoDialog = () => {
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
         videoBitsPerSecond: 5_000_000,
-        audioBitsPerSecond: 128_000
+        audioBitsPerSecond: 320_000 // Alta qualidade de áudio
       });
 
       const chunks: Blob[] = [];
@@ -530,7 +532,8 @@ export const ExportVideoDialog = () => {
               '-preset', 'veryfast',
               '-crf', '23',
               '-c:a', 'aac',
-              '-b:a', '192k',
+              '-b:a', '320k', // Alta qualidade de áudio
+              '-ar', '48000', // Sample rate de 48kHz
               outputName
             ]);
 
@@ -573,7 +576,7 @@ export const ExportVideoDialog = () => {
       // Pré-agendar fontes de áudio para o MediaStreamDestination
       const scheduledSources: AudioBufferSourceNode[] = [];
       const baseTime = audioContext.currentTime;
-      audioBuffers.forEach(({ start, buffer, duration, volume, speed }) => {
+      audioBuffers.forEach(({ start, buffer, duration, volume, speed, trimStart }) => {
         try {
           const source = audioContext.createBufferSource();
           source.buffer = buffer;
@@ -586,8 +589,10 @@ export const ExportVideoDialog = () => {
           gainNode.connect(audioDestination);
 
           const when = baseTime + Math.max(0, start);
-          const maxDur = Math.max(0, Math.min(buffer.duration / speed, duration / speed));
-          source.start(when, 0, maxDur);
+          // Usar trimStart para começar do ponto correto no buffer
+          const offset = Math.max(0, trimStart);
+          const maxDur = Math.max(0, Math.min((buffer.duration - offset) / speed, duration / speed));
+          source.start(when, offset, maxDur);
           scheduledSources.push(source);
         } catch (e) {
           console.error('Agendamento de áudio falhou:', e);
