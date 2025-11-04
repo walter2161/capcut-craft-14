@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { Download, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -283,6 +285,7 @@ export const ExportVideoDialog = () => {
 
       // Criar AudioContext para capturar áudio
       const audioContext = new AudioContext({ sampleRate: 48000 });
+      await audioContext.resume();
       const audioDestination = audioContext.createMediaStreamDestination();
 
       // Preparar clips de áudio
@@ -345,14 +348,17 @@ export const ExportVideoDialog = () => {
         }
       }
 
-      // Capturar stream do canvas
       const videoStream = exportCanvas.captureStream(fps);
+      
+      // Debug: verificar trilhas de áudio
+      console.log('Audio buffers para exportar:', audioBuffers.length);
       
       // Combinar streams de vídeo e áudio
       const combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioDestination.stream.getAudioTracks()
       ]);
+      console.log('Trilhas combinadas - vídeo:', videoStream.getVideoTracks().length, 'áudio:', audioDestination.stream.getAudioTracks().length);
       
       // Configurar MediaRecorder com áudio e vídeo
       const candidateTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
@@ -376,27 +382,72 @@ export const ExportVideoDialog = () => {
       };
 
       const stopped = new Promise<void>((resolve) => {
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: mimeType });
-          if (blob.size < 1024) {
-            toast.error("Arquivo de vídeo vazio");
+        mediaRecorder.onstop = async () => {
+          try {
+            const blob = new Blob(chunks, { type: mimeType });
+            if (blob.size < 1024) {
+              toast.error("Arquivo de vídeo vazio");
+              setIsExporting(false);
+              resolve();
+              return;
+            }
+
+            // Transcodificar para MP4 (H.264 + AAC)
+            setExportProgress((p) => Math.min(95, p));
+            toast.message("Convertendo para MP4... isso pode levar alguns minutos");
+
+            const ffmpeg = new FFmpeg();
+            await ffmpeg.load({
+              coreURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.js', 'text/javascript'),
+              wasmURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.wasm', 'application/wasm'),
+              workerURL: await toBlobURL('https://unpkg.com/@ffmpeg/core@0.12.2/dist/ffmpeg-core.worker.js', 'text/javascript'),
+            });
+
+            const inputName = 'input.webm';
+            const outputName = 'output.mp4';
+            await ffmpeg.writeFile(inputName, await fetchFile(blob));
+
+            // -preset veryfast para acelerar, ajuste CRF conforme necessário
+            await ffmpeg.exec([
+              '-i', inputName,
+              '-c:v', 'libx264',
+              '-preset', 'veryfast',
+              '-crf', '23',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              outputName
+            ]);
+
+            const data = await ffmpeg.readFile(outputName);
+            const mp4Blob = new Blob([new Uint8Array(data as any)], { type: 'video/mp4' });
+            const url = URL.createObjectURL(mp4Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.mp4`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast.success("Vídeo exportado em MP4 com sucesso!");
             setIsExporting(false);
+            setExportProgress(100);
+            setTimeout(() => setIsOpen(false), 1500);
             resolve();
-            return;
+          } catch (err) {
+            console.error('Falha na conversão para MP4, baixando WEBM como fallback', err);
+            // Fallback: baixar WEBM
+            const blob = new Blob(chunks, { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.warning("MP4 indisponível, WEBM exportado como alternativa");
+            setIsExporting(false);
+            setExportProgress(100);
+            setTimeout(() => setIsOpen(false), 1500);
+            resolve();
           }
-          
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${globalSettings.videoFormat}_${dimensions.width}x${dimensions.height}.webm`;
-          a.click();
-          URL.revokeObjectURL(url);
-          
-          toast.success("Vídeo exportado com sucesso!");
-          setIsExporting(false);
-          setExportProgress(100);
-          setTimeout(() => setIsOpen(false), 1500);
-          resolve();
         };
       });
 
@@ -535,7 +586,7 @@ export const ExportVideoDialog = () => {
           {isExporting && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Renderizando vídeo...</span>
+                <span>Renderizando vídeo e convertendo para MP4...</span>
                 <span>{exportProgress}%</span>
               </div>
               <Progress value={exportProgress} />
