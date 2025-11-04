@@ -37,17 +37,24 @@ export const ThumbnailEditor = () => {
 
   // Renderizar preview da thumbnail
   useEffect(() => {
+    console.log('ThumbnailEditor useEffect', { isOpen, hasCanvas: !!canvasRef.current, enabled: formData.enabled, clipsCount: clips.length });
+    
     if (!isOpen || !canvasRef.current || !formData.enabled) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Limpar canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     // Pegar primeira imagem
     const firstImageClip = clips.find(c => c.type === 'image' && c.track.startsWith('V'));
+    console.log('First image clip:', firstImageClip);
+    
     if (!firstImageClip) {
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#666666';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
@@ -56,12 +63,29 @@ export const ThumbnailEditor = () => {
     }
 
     const mediaItem = mediaItems.find(m => m.id === firstImageClip.mediaId);
-    if (!mediaItem) return;
+    console.log('Media item:', mediaItem);
+    
+    if (!mediaItem) {
+      ctx.fillStyle = '#666666';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Imagem não encontrada', canvas.width / 2, canvas.height / 2);
+      return;
+    }
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    
+    img.onerror = (e) => {
+      console.error('Erro ao carregar imagem:', e);
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Erro ao carregar imagem', canvas.width / 2, canvas.height / 2);
+    };
     
     img.onload = () => {
+      console.log('Imagem carregada:', img.width, 'x', img.height);
+      
       // Desenhar imagem de fundo
       const imgRatio = img.width / img.height;
       const canvasRatio = canvas.width / canvas.height;
@@ -163,10 +187,30 @@ export const ThumbnailEditor = () => {
       }
     };
 
+    // Lidar com diferentes tipos de dados de imagem
     if (mediaItem.data instanceof HTMLImageElement) {
+      console.log('Tipo: HTMLImageElement');
       img.src = mediaItem.data.src;
     } else if (typeof mediaItem.data === 'string') {
+      console.log('Tipo: string URL');
       img.src = mediaItem.data;
+    } else if (mediaItem.data instanceof Blob || mediaItem.data instanceof File) {
+      console.log('Tipo: Blob/File');
+      const url = URL.createObjectURL(mediaItem.data);
+      img.onload = () => {
+        const originalOnload = img.onload;
+        if (typeof originalOnload === 'function') {
+          originalOnload.call(img);
+        }
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } else {
+      console.error('Tipo de dados não suportado:', typeof mediaItem.data, mediaItem.data);
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Formato de imagem não suportado', canvas.width / 2, canvas.height / 2);
     }
   }, [isOpen, formData, clips, mediaItems, globalSettings]);
 
