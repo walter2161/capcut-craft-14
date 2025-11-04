@@ -34,6 +34,7 @@ export interface GlobalSettings {
   defaultTransitionDuration: number;
   videoFPS: number;
   videoFormat: '16:9' | '9:16' | '1:1';
+  mediaFitMode: 'fit-width' | 'fit-height' | 'contain';
 }
 
 interface EditorState {
@@ -79,6 +80,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     defaultTransitionDuration: 500,
     videoFPS: 30,
     videoFormat: '9:16',
+    mediaFitMode: 'fit-height',
   },
   projectName: 'Post Imóvel 9:16',
 

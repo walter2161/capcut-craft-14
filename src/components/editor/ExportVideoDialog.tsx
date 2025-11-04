@@ -46,18 +46,37 @@ export const ExportVideoDialog = () => {
     }
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = srcWidth / srcHeight;
+    const fitMode = globalSettings.mediaFitMode || 'fit-height';
+    
     let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
-    if (imgRatio > canvasRatio) {
+    
+    if (fitMode === 'fit-width') {
+      // Expandida na horizontal - preencher largura
       drawWidth = canvas.width;
       drawHeight = drawWidth / imgRatio;
       offsetX = 0;
       offsetY = (canvas.height - drawHeight) / 2;
-    } else {
+    } else if (fitMode === 'fit-height') {
+      // Expandida na vertical - preencher altura
       drawHeight = canvas.height;
       drawWidth = imgRatio * drawHeight;
       offsetX = (canvas.width - drawWidth) / 2;
       offsetY = 0;
+    } else {
+      // Contida - a mídia inteira visível dentro do canvas
+      if (imgRatio > canvasRatio) {
+        drawWidth = canvas.width;
+        drawHeight = drawWidth / imgRatio;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      } else {
+        drawHeight = canvas.height;
+        drawWidth = imgRatio * drawHeight;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      }
     }
+    
     return { drawWidth, drawHeight, offsetX, offsetY };
   };
 
