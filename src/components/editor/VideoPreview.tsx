@@ -613,9 +613,9 @@ export const VideoPreview = () => {
           
           {/* Legendas */}
           {currentSubtitle && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-center max-w-[90%]">
+            <div className="absolute bottom-[100px] left-1/2 transform -translate-x-1/2 text-center max-w-[90%]">
               <p 
-                className="text-sm font-semibold leading-relaxed text-white font-montserrat"
+                className="text-lg font-semibold leading-relaxed text-white font-montserrat"
                 style={{ textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}
               >
                 {currentSubtitle}
