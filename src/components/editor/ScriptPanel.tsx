@@ -139,18 +139,28 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
         Math.max(max, clip.start + clip.duration), 0
       );
 
-      // Estimar duração por frase (aproximadamente 3 segundos por frase)
-      const durationPerSentence = 3000;
+      // Calcular duração baseado no número de palavras (velocidade de fala: ~150 palavras/minuto)
+      const calculateDuration = (text: string) => {
+        const words = text.split(/\s+/).length;
+        const wpm = 150; // palavras por minuto
+        const durationSeconds = (words / wpm) * 60;
+        // Adicionar um buffer de tempo para respiração entre frases
+        return Math.max(2000, Math.ceil(durationSeconds * 1000) + 1000);
+      };
+
+      let currentStart = startPosition;
       
       // Criar clips de legenda para cada frase
       sentences.forEach((sentence, index) => {
+        const duration = calculateDuration(sentence);
+        
         addClip({
           id: `subtitle-${Date.now()}-${index}`,
           type: 'subtitle',
           mediaId: `subtitle-${Date.now()}-${index}`,
           track: 'SUB1',
-          start: startPosition + (index * durationPerSentence),
-          duration: durationPerSentence,
+          start: currentStart,
+          duration: duration,
           scale: 1,
           brightness: 0,
           contrast: 0,
@@ -159,6 +169,8 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
           opacity: 1,
           text: sentence
         });
+        
+        currentStart += duration;
       });
 
       updateTotalDuration();
