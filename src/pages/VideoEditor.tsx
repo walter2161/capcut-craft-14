@@ -13,48 +13,45 @@ const VideoEditor = () => {
   const { updateThumbnailData, thumbnailData } = useEditorStore();
   const { propertyData } = usePropertyStore();
   
-  // Sincronizar dados do imóvel com a thumbnail
+  // Sincronizar dados do imóvel com a thumbnail sempre que propertyData mudar
   useEffect(() => {
     if (propertyData && propertyData.cidade) {
-      // Só atualiza se os dados ainda não foram preenchidos manualmente
-      if (!thumbnailData.title && !thumbnailData.price) {
-        const bedrooms = propertyData.quartos ? `${propertyData.quartos}` : '';
-        const bathrooms = propertyData.banheiros ? `${propertyData.banheiros}` : '';
-        const area = propertyData.area ? `${propertyData.area}` : '';
-        
-        // Formatar preço
-        let price = '';
-        if (propertyData.valor) {
-          if (propertyData.transacao === 'Venda') {
-            price = `R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
-          } else {
-            price = `R$ ${propertyData.valor.toLocaleString('pt-BR')}/mês`;
-          }
+      const bedrooms = propertyData.quartos ? `${propertyData.quartos}` : '';
+      const bathrooms = propertyData.banheiros ? `${propertyData.banheiros}` : '';
+      const area = propertyData.area ? `${propertyData.area}` : '';
+      
+      // Formatar preço
+      let price = '';
+      if (propertyData.valor) {
+        if (propertyData.transacao === 'Venda') {
+          price = `R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
+        } else {
+          price = `R$ ${propertyData.valor.toLocaleString('pt-BR')}/mês`;
         }
-        
-        // Formatar localização
-        const location = [
-          propertyData.bairro,
-          propertyData.cidade,
-          propertyData.estado
-        ].filter(Boolean).join(', ');
-        
-        // Título baseado no tipo
-        const title = `${propertyData.tipo} ${propertyData.transacao === 'Venda' ? 'à Venda' : 'para Alugar'}`;
-        
-        updateThumbnailData({
-          enabled: true,
-          title,
-          price,
-          bedrooms,
-          bathrooms,
-          area,
-          location,
-          referencia: propertyData.referencia || ''
-        });
       }
+      
+      // Formatar localização
+      const location = [
+        propertyData.bairro,
+        propertyData.cidade,
+        propertyData.estado
+      ].filter(Boolean).join(', ');
+      
+      // Título baseado no tipo
+      const title = `${propertyData.tipo} ${propertyData.transacao === 'Venda' ? 'à Venda' : 'para Alugar'}`;
+      
+      updateThumbnailData({
+        enabled: true,
+        title,
+        price,
+        bedrooms,
+        bathrooms,
+        area,
+        location,
+        referencia: propertyData.referencia || ''
+      });
     }
-  }, [propertyData, updateThumbnailData, thumbnailData]);
+  }, [propertyData, updateThumbnailData]);
   
   return (
     <div className="h-screen flex flex-col bg-[hsl(var(--editor-bg))]">

@@ -430,15 +430,21 @@ export const ExportVideoDialog = () => {
     if (currentSubtitle && currentSubtitle.text) {
       const trackState = trackStates.find(t => t.name === currentSubtitle.track);
       if (!trackState?.hidden) {
-        // Configurar estilo do texto
-        const fontSize = Math.floor(canvas.height * 0.04); // 4% da altura do canvas
-        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        // Configurar estilo do texto - Montserrat, text-lg, com sombra
+        const fontSize = Math.floor(canvas.height * 0.022); // ~text-lg (aproximadamente)
+        ctx.font = `600 ${fontSize}px Montserrat, Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
+        
+        // Configurar sombra
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
       
         const text = currentSubtitle.text;
         const maxWidth = canvas.width * 0.9;
-        const lineHeight = fontSize * 1.2;
+        const lineHeight = fontSize * 1.5;
         
         // Quebrar texto em múltiplas linhas se necessário
         const words = text.split(' ');
@@ -458,24 +464,24 @@ export const ExportVideoDialog = () => {
         });
         if (currentLine) lines.push(currentLine);
         
-        // Desenhar fundo semi-transparente
-        const padding = fontSize * 0.6;
-        const totalHeight = lines.length * lineHeight + padding * 2;
-        const bgY = canvas.height - fontSize * 2 - totalHeight;
-        
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, bgY, canvas.width, totalHeight);
-        
-        // Desenhar texto com contorno
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-        ctx.lineWidth = fontSize * 0.15;
+        // Desenhar texto branco com sombra (sem fundo)
         ctx.fillStyle = '#FFFFFF';
         
+        // Calcular posição: 100px do rodapé
+        const subtitleBottomMargin = 100;
+        const totalHeight = lines.length * lineHeight;
+        const startY = canvas.height - subtitleBottomMargin - totalHeight + lineHeight;
+        
         lines.forEach((line, index) => {
-          const textY = bgY + padding + (index + 1) * lineHeight;
-          ctx.strokeText(line, canvas.width / 2, textY);
+          const textY = startY + (index * lineHeight);
           ctx.fillText(line, canvas.width / 2, textY);
         });
+        
+        // Resetar sombra
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
       }
     }
   };
