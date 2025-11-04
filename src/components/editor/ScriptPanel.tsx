@@ -24,6 +24,25 @@ export const ScriptPanel = () => {
     setIsGenerating(true);
 
     try {
+      const iniciosCordiais = [
+        "Oi, pessoal! Hoje vou mostrar pra vocês um imóvel que está disponível",
+        "Olá, gente! Passei aqui pra apresentar um imóvel que pode ser uma ótima opção pra você",
+        "Oi, galera! Quero te mostrar rapidamente um imóvel que vale a pena conhecer",
+        "Olá, pessoal! Separei um tempinho pra te mostrar esse imóvel que chegou pra venda",
+        "Oi, tudo bem? Tenho uma ótima oportunidade e quero te apresentar esse imóvel com calma"
+      ];
+
+      const finaisChamada = [
+        "Gostou do imóvel? Me chama no WhatsApp que te envio todas as informações",
+        "Esse imóvel pode sair rápido, então me chama agora pra ver disponibilidade",
+        "Se esse imóvel não for o ideal, me chama que te envio outras opções no mesmo perfil",
+        "Quer conhecer pessoalmente? Me chama e agendo uma visita pra você",
+        "Gostou do imóvel? Clica no link da bio ou chama no WhatsApp que eu te respondo na hora"
+      ];
+
+      const inicioEscolhido = iniciosCordiais[Math.floor(Math.random() * iniciosCordiais.length)];
+      const fimEscolhido = finaisChamada[Math.floor(Math.random() * finaisChamada.length)];
+
       const prompt = `Crie um roteiro profissional para narração de vídeo sobre este imóvel para redes sociais (TikTok/Instagram Reels):
 
 Tipo: ${propertyData.tipo}
@@ -36,19 +55,30 @@ Diferenciais: ${propertyData.diferenciais.join(', ') || 'Imóvel de qualidade'}
 
 IMPORTANTE: Retorne APENAS o texto da narração, sem títulos, sem marcações como "INÍCIO:", "MEIO:", "FIM:", sem asteriscos, sem formatação. Apenas o texto corrido que será lido pela locutora.
 
-O roteiro deve ter:
-- Gancho forte e impactante (2-3 frases que prendem atenção)
-- Desenvolvimento com detalhes principais do imóvel e localização (3-4 frases)
-- Call-to-action claro e urgente (1-2 frases)
+ESTRUTURA OBRIGATÓRIA:
+
+1. INÍCIO (use exatamente este texto):
+"${inicioEscolhido}"
+
+2. MEIO (desenvolva este conteúdo com 5-7 frases):
+- Apresente o tipo de imóvel e localização específica
+- Destaque as características principais (quartos, banheiros, vagas, área)
+- Mencione o valor de forma atrativa
+- Realce os principais diferenciais do imóvel
+- Use linguagem natural e entusiasmada
+
+3. FIM (use exatamente este texto):
+"${fimEscolhido}"
 
 Características do roteiro:
 - Linguagem clara, natural e conversacional
 - Tom entusiasmado mas profissional
-- Entre 60-80 palavras (para 30-40 segundos de narração)
+- Entre 100-130 palavras (para 45-60 segundos de narração)
 - Sem emojis ou hashtags (apenas texto para narração)
 - Frases curtas e diretas
 - Use os dados reais do imóvel fornecidos acima
-- Retorne apenas o texto puro, sem nenhuma formatação ou marcação`;
+- Retorne apenas o texto puro, sem nenhuma formatação ou marcação
+- NÃO repita o início e o fim que já foram fornecidos, apenas use-os nas posições corretas`;
 
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -65,7 +95,7 @@ Características do roteiro:
             },
           ],
           temperature: 0.8,
-          max_tokens: 400,
+          max_tokens: 600,
         }),
       });
 
@@ -92,11 +122,26 @@ Características do roteiro:
       const quartos = propertyData.quartos || 0;
       const valor = propertyData.valor ? `R$ ${propertyData.valor.toLocaleString('pt-BR')}` : '';
       
-      const fallback = `Você está procurando o ${tipo.toLowerCase()} perfeito em ${bairro}? Então presta atenção!
+      const iniciosCordiais = [
+        "Oi, pessoal! Hoje vou mostrar pra vocês um imóvel que está disponível",
+        "Olá, gente! Passei aqui pra apresentar um imóvel que pode ser uma ótima opção pra você",
+        "Oi, galera! Quero te mostrar rapidamente um imóvel que vale a pena conhecer",
+        "Olá, pessoal! Separei um tempinho pra te mostrar esse imóvel que chegou pra venda",
+        "Oi, tudo bem? Tenho uma ótima oportunidade e quero te apresentar esse imóvel com calma"
+      ];
 
-Este ${tipo.toLowerCase()} incrível tem ${quartos} quartos e está localizado em ${cidade}. Amplo, bem localizado e com acabamento de qualidade. ${valor ? `Por apenas ${valor}.` : ''}
+      const finaisChamada = [
+        "Gostou do imóvel? Me chama no WhatsApp que te envio todas as informações",
+        "Esse imóvel pode sair rápido, então me chama agora pra ver disponibilidade",
+        "Se esse imóvel não for o ideal, me chama que te envio outras opções no mesmo perfil",
+        "Quer conhecer pessoalmente? Me chama e agendo uma visita pra você",
+        "Gostou do imóvel? Clica no link da bio ou chama no WhatsApp que eu te respondo na hora"
+      ];
 
-Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. Esse imóvel não vai ficar disponível por muito tempo!`;
+      const inicioEscolhido = iniciosCordiais[Math.floor(Math.random() * iniciosCordiais.length)];
+      const fimEscolhido = finaisChamada[Math.floor(Math.random() * finaisChamada.length)];
+      
+      const fallback = `${inicioEscolhido}. Este ${tipo.toLowerCase()} incrível em ${bairro} tem ${quartos} quartos e está localizado em ${cidade}. Amplo, bem localizado e com acabamento de qualidade. ${valor ? `Por apenas ${valor}.` : ''} ${fimEscolhido}.`;
       setScript(fallback);
       toast.success('Roteiro gerado (fallback)');
     } finally {
