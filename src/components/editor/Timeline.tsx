@@ -23,7 +23,7 @@ export const Timeline = () => {
     splitClip
   } = useEditorStore();
 
-  const [tracks, setTracks] = useState(['V1', 'A1']);
+  const [tracks, setTracks] = useState(['V1', 'A1', 'SUB1']);
   const [zoom, setZoom] = useState(1);
 
   const animationRef = useRef<number>();
@@ -341,6 +341,7 @@ export const Timeline = () => {
         {tracks.map((trackName, idx) => {
           const trackClips = clips.filter(c => c.track === trackName);
           const isVideoTrack = trackName.startsWith('V');
+          const isSubtitleTrack = trackName.startsWith('SUB');
           
           return (
             <div 
@@ -378,10 +379,14 @@ export const Timeline = () => {
                         selectedClipIds.includes(clip.id)
                           ? isVideoTrack 
                             ? 'bg-[hsl(var(--clip-video))]/90 border-2 border-primary'
-                            : 'bg-[hsl(var(--clip-audio))]/90 border-2 border-primary'
+                            : isSubtitleTrack
+                              ? 'bg-purple-600/90 border-2 border-primary'
+                              : 'bg-[hsl(var(--clip-audio))]/90 border-2 border-primary'
                           : isVideoTrack
                             ? 'bg-[hsl(var(--clip-video))] border-2 border-transparent hover:opacity-80'
-                            : 'bg-[hsl(var(--clip-audio))] border-2 border-transparent hover:opacity-80'
+                            : isSubtitleTrack
+                              ? 'bg-purple-600 border-2 border-transparent hover:opacity-80'
+                              : 'bg-[hsl(var(--clip-audio))] border-2 border-transparent hover:opacity-80'
                       }`}
                       style={{
                         left: `${clip.start / MS_PER_PIXEL}px`,
@@ -396,7 +401,7 @@ export const Timeline = () => {
                         />
                       )}
                       <div className="px-2 text-xs text-white truncate leading-10 relative z-10 flex items-center justify-between">
-                        <span className="truncate flex-1">{mediaItem?.name || 'Clip'}</span>
+                        <span className="truncate flex-1">{clip.text || mediaItem?.name || 'Clip'}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

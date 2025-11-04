@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Volume2, RefreshCw } from 'lucide-react';
+import { Sparkles, Captions, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/store/editorStore';
 import { usePropertyStore } from '@/store/propertyStore';
@@ -11,8 +11,8 @@ const MISTRAL_API_KEY = 'aynCSftAcQBOlxmtmpJqVzco8K4aaTDQ';
 export const ScriptPanel = () => {
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
-  const { addMediaItem, addClip, clips, updateTotalDuration } = useEditorStore();
+  const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState(false);
+  const { addClip, clips, updateTotalDuration } = useEditorStore();
   const { propertyData } = usePropertyStore();
 
   const generateScript = async () => {
@@ -104,99 +104,70 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
     }
   };
 
-  const convertToAudio = async () => {
+  const generateSubtitles = () => {
     if (!script.trim()) {
       toast.error('Escreva ou gere um roteiro primeiro');
       return;
     }
 
-    setIsConverting(true);
-    toast.info('Gerando áudio da narração...');
+    setIsGeneratingSubtitles(true);
+    toast.info('Gerando legendas...');
 
     try {
-      console.log('Iniciando conversão de texto para áudio com travisvn TTS...');
-      
-      // Limpar o texto removendo qualquer marcação ou formatação
+      // Limpar o texto
       const cleanText = script
-        .replace(/\*\*/g, '')  // Remove asteriscos
-        .replace(/INÍCIO:|MEIO:|FIM:/gi, '')  // Remove marcações
-        .replace(/\n\n+/g, ' ')  // Remove quebras de linha duplas
+        .replace(/\*\*/g, '')
+        .replace(/INÍCIO:|MEIO:|FIM:/gi, '')
+        .replace(/\n\n+/g, ' ')
         .trim();
-      
-      console.log('Texto limpo:', cleanText);
-      
-      // Usar travisvn TTS API
-      const response = await fetch('https://tts.travisvn.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          input: cleanText,
-          model: 'tts-1',
-          voice: 'pt-BR-FranciscaNeural',
-          response_format: 'mp3'
-        })
-      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na API travisvn:', errorText);
-        throw new Error('Erro ao gerar áudio');
+      // Dividir o roteiro em frases
+      const sentences = cleanText
+        .split(/[.!?]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      if (sentences.length === 0) {
+        toast.error('Não foi possível dividir o roteiro em frases');
+        setIsGeneratingSubtitles(false);
+        return;
       }
 
-      const audioBlob = await response.blob();
-      
-      console.log('Áudio gerado com sucesso:', audioBlob);
-
-      // Criar AudioBuffer a partir do blob
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      // Adicionar à biblioteca de mídia
-      const mediaId = `audio-script-${Date.now()}`;
-      addMediaItem({
-        id: mediaId,
-        type: 'audio',
-        name: 'Narração do Roteiro',
-        data: audioBuffer,
-        duration: audioBuffer.duration * 1000,
-        audioBlob: audioBlob
-      });
-
-      // Adicionar à timeline
-      const audioClips = clips.filter(c => c.type === 'audio' && c.track === 'A1');
-      const lastPosition = audioClips.reduce((max, clip) => 
+      // Verificar se já existe track de legenda
+      const subtitleClips = clips.filter(c => c.track === 'SUB1');
+      const startPosition = subtitleClips.reduce((max, clip) => 
         Math.max(max, clip.start + clip.duration), 0
       );
 
-      addClip({
-        id: `clip-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-        type: 'audio',
-        mediaId,
-        track: 'A1',
-        start: lastPosition,
-        duration: audioBuffer.duration * 1000,
-        scale: 1,
-        brightness: 0,
-        contrast: 0,
-        volume: 1,
-        speed: 1,
-        opacity: 1,
-        transition: 'none',
-        transitionDuration: 0
+      // Estimar duração por frase (aproximadamente 3 segundos por frase)
+      const durationPerSentence = 3000;
+      
+      // Criar clips de legenda para cada frase
+      sentences.forEach((sentence, index) => {
+        addClip({
+          id: `subtitle-${Date.now()}-${index}`,
+          type: 'subtitle',
+          mediaId: `subtitle-${Date.now()}-${index}`,
+          track: 'SUB1',
+          start: startPosition + (index * durationPerSentence),
+          duration: durationPerSentence,
+          scale: 1,
+          brightness: 0,
+          contrast: 0,
+          volume: 1,
+          speed: 1,
+          opacity: 1,
+          text: sentence
+        });
       });
 
       updateTotalDuration();
-      await audioContext.close();
-      
-      toast.success('Áudio adicionado à timeline!');
+      toast.success(`${sentences.length} legendas adicionadas à timeline!`);
     } catch (error) {
-      console.error('Erro ao converter para áudio:', error);
-      toast.error('Erro ao gerar áudio. Tente novamente.');
+      console.error('Erro ao gerar legendas:', error);
+      toast.error('Erro ao gerar legendas. Tente novamente.');
     } finally {
-      setIsConverting(false);
+      setIsGeneratingSubtitles(false);
     }
   };
 
@@ -211,7 +182,7 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
 
       <Button
         onClick={generateScript}
-        disabled={isGenerating || isConverting}
+        disabled={isGenerating || isGeneratingSubtitles}
         variant="secondary"
         className="w-full"
         size="sm"
@@ -239,26 +210,26 @@ Não perca essa oportunidade! Entre em contato agora mesmo e agende sua visita. 
       </div>
 
       <Button
-        onClick={convertToAudio}
-        disabled={!script.trim() || isConverting || isGenerating}
+        onClick={generateSubtitles}
+        disabled={!script.trim() || isGeneratingSubtitles || isGenerating}
         className="w-full"
         size="sm"
       >
-        {isConverting ? (
+        {isGeneratingSubtitles ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            Convertendo...
+            Gerando Legendas...
           </>
         ) : (
           <>
-            <Volume2 className="w-4 h-4 mr-2" />
-            Converter em Áudio
+            <Captions className="w-4 h-4 mr-2" />
+            Gerar Legendas
           </>
         )}
       </Button>
 
       <p className="text-xs text-muted-foreground">
-        O áudio será automaticamente adicionado à timeline
+        As legendas serão adicionadas à timeline e reproduzidas com voz do navegador
       </p>
     </div>
   );

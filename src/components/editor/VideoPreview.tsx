@@ -2,6 +2,9 @@ import { useRef, useEffect, useState } from "react";
 import { useEditorStore } from "@/store/editorStore";
 import { Button } from "@/components/ui/button";
 
+// Singleton para gerenciar a síntese de voz
+let currentUtterance: SpeechSynthesisUtterance | null = null;
+
 export const VideoPreview = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -10,7 +13,9 @@ export const VideoPreview = () => {
   const { clips, mediaItems, currentTime, isPlaying, globalSettings } = useEditorStore();
   const [zoom, setZoom] = useState(1);
   const [, forceRerender] = useState(0);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const lastSpokenSubtitleRef = useRef<string>('');
 
   // Resolve a drawable element for a media item (preloads images from URL strings)
   const getDrawable = (item: { type: 'image' | 'video' | 'audio'; data: any }): HTMLImageElement | HTMLVideoElement | null => {
@@ -68,8 +73,10 @@ export const VideoPreview = () => {
     // Gerenciar reprodução de áudio
     if (isPlaying) {
       playAudio(currentTime);
+      handleSubtitles(currentTime);
     } else {
       stopAudio();
+      stopSpeech();
     }
   }, [currentTime, clips, mediaItems, isPlaying]);
 
@@ -159,6 +166,51 @@ export const VideoPreview = () => {
         // Ignorar erro se já parado
       }
       audioSourceRef.current = null;
+    }
+  };
+
+  const handleSubtitles = (time: number) => {
+    const subtitleClips = clips.filter(c => c.type === 'subtitle');
+    const currentClip = subtitleClips.find(
+      c => c.start <= time && c.start + c.duration > time
+    );
+
+    if (currentClip && currentClip.text) {
+      setCurrentSubtitle(currentClip.text);
+      
+      // Reproduzir voz apenas se for uma nova legenda
+      if (lastSpokenSubtitleRef.current !== currentClip.text) {
+        speakText(currentClip.text);
+        lastSpokenSubtitleRef.current = currentClip.text;
+      }
+    } else {
+      setCurrentSubtitle('');
+      if (lastSpokenSubtitleRef.current) {
+        stopSpeech();
+        lastSpokenSubtitleRef.current = '';
+      }
+    }
+  };
+
+  const speakText = (text: string) => {
+    // Parar qualquer fala em andamento
+    if (currentUtterance) {
+      window.speechSynthesis.cancel();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    
+    currentUtterance = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeech = () => {
+    if (currentUtterance) {
+      window.speechSynthesis.cancel();
+      currentUtterance = null;
     }
   };
 
@@ -347,6 +399,15 @@ export const VideoPreview = () => {
           <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/70 px-2 py-1 rounded whitespace-nowrap">
             {globalSettings.videoFormat}
           </div>
+          
+          {/* Legendas */}
+          {currentSubtitle && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-lg text-center max-w-[90%] backdrop-blur-sm">
+              <p className="text-base font-semibold leading-relaxed">
+                {currentSubtitle}
+              </p>
+            </div>
+          )}
         </div>
         {clips.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">

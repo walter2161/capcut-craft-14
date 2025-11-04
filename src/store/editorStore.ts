@@ -12,7 +12,7 @@ export interface MediaItem {
 
 export interface Clip {
   id: string;
-  type: 'image' | 'video' | 'audio';
+  type: 'image' | 'video' | 'audio' | 'subtitle';
   mediaId: string;
   track: string;
   start: number;
@@ -25,6 +25,7 @@ export interface Clip {
   opacity: number;
   transition?: 'cross-fade' | 'none';
   transitionDuration?: number;
+  text?: string; // Para clips de legenda
 }
 
 export interface GlobalSettings {
