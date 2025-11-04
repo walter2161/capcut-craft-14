@@ -46,7 +46,7 @@ export const ExportVideoDialog = () => {
     }
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = srcWidth / srcHeight;
-    const fitMode = globalSettings.mediaFitMode || 'fit-height';
+    const fitMode = globalSettings?.mediaFitMode || 'fit-height';
     
     let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
     
