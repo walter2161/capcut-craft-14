@@ -157,6 +157,44 @@ export const GlobalSettingsDialog = () => {
               Como as mídias devem ser ajustadas no formato do vídeo
             </p>
           </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium">Efeitos de Imagem</h3>
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Efeito de Pan</Label>
+                <p className="text-xs text-muted-foreground">
+                  Deslocamento horizontal em imagens horizontais (vídeo vertical)
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={globalSettings.enablePanEffect}
+                onChange={(e) =>
+                  updateGlobalSettings({ enablePanEffect: e.target.checked })
+                }
+                className="h-4 w-4"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Efeito de Zoom</Label>
+                <p className="text-xs text-muted-foreground">
+                  Zoom in/out suave nas imagens
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={globalSettings.enableZoomEffect}
+                onChange={(e) =>
+                  updateGlobalSettings({ enableZoomEffect: e.target.checked })
+                }
+                className="h-4 w-4"
+              />
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

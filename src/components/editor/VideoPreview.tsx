@@ -193,18 +193,20 @@ export const VideoPreview = () => {
     }
   };
 
-  const fitImageToCanvas = (media: any, canvas: HTMLCanvasElement) => {
+  const fitImageToCanvas = (media: any, canvas: HTMLCanvasElement, progress: number = 0, duration: number = 0) => {
     // Support Image, HTMLVideoElement, and CanvasImageSource
     const srcWidth = media?.videoWidth || media?.naturalWidth || media?.width || 0;
     const srcHeight = media?.videoHeight || media?.naturalHeight || media?.height || 0;
 
     if (!srcWidth || !srcHeight) {
-      return { drawWidth: canvas.width, drawHeight: canvas.height, offsetX: 0, offsetY: 0 };
+      return { drawWidth: canvas.width, drawHeight: canvas.height, offsetX: 0, offsetY: 0, panOffsetX: 0, scale: 1 };
     }
 
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = srcWidth / srcHeight;
     const fitMode = globalSettings?.mediaFitMode || 'fit-height';
+    const isHorizontalImage = imgRatio > 1;
+    const isVerticalVideo = globalSettings.videoFormat === '9:16';
     
     let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
     
@@ -234,8 +236,22 @@ export const VideoPreview = () => {
         offsetY = 0;
       }
     }
+
+    // Apply pan effect for horizontal images in vertical video
+    let panOffsetX = 0;
+    if (globalSettings.enablePanEffect && isHorizontalImage && isVerticalVideo && duration > 0) {
+      const maxPan = (drawWidth - canvas.width) * 0.3; // Pan 30% of overflow
+      panOffsetX = -maxPan * Math.sin(progress * Math.PI); // Smooth pan left-right
+    }
+
+    // Apply zoom effect
+    let scale = 1;
+    if (globalSettings.enableZoomEffect && duration > 0) {
+      const zoomAmount = 0.1; // 10% zoom
+      scale = 1 + (zoomAmount * progress); // Zoom from 1.0 to 1.1
+    }
     
-    return { drawWidth, drawHeight, offsetX, offsetY };
+    return { drawWidth, drawHeight, offsetX, offsetY, panOffsetX, scale };
   };
 
   const renderThumbnail = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
@@ -463,17 +479,28 @@ export const VideoPreview = () => {
         if (nextMediaItem) {
           const nextMedia = getDrawable(nextMediaItem as any);
           if (nextMedia) {
-            const nextImgProps = fitImageToCanvas(nextMedia, canvas);
+            const nextProgress = 0; // Próximo clip começa do início
+            const nextDuration = nextClip.duration;
+            const nextImgProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             
             ctx.filter = 'none';
             ctx.globalAlpha = 1;
             
-            const nextScaledWidth = nextImgProps.drawWidth * nextClip.scale;
-            const nextScaledHeight = nextImgProps.drawHeight * nextClip.scale;
-            const nextOffsetX = (canvas.width - nextScaledWidth) / 2;
+            const nextScaledWidth = nextImgProps.drawWidth * nextClip.scale * nextImgProps.scale;
+            const nextScaledHeight = nextImgProps.drawHeight * nextClip.scale * nextImgProps.scale;
+            const nextOffsetX = (canvas.width - nextScaledWidth) / 2 + nextImgProps.panOffsetX;
             const nextOffsetY = (canvas.height - nextScaledHeight) / 2;
             
-            ctx.drawImage(nextMedia, nextOffsetX, nextOffsetY, nextScaledWidth, nextScaledHeight);
+            ctx.save();
+            if (nextImgProps.scale !== 1) {
+              const centerX = nextOffsetX + nextScaledWidth / 2;
+              const centerY = nextOffsetY + nextScaledHeight / 2;
+              ctx.translate(centerX, centerY);
+              ctx.scale(nextImgProps.scale, nextImgProps.scale);
+              ctx.translate(-centerX, -centerY);
+            }
+            ctx.drawImage(nextMedia, nextOffsetX, nextOffsetY, nextScaledWidth / nextImgProps.scale, nextScaledHeight / nextImgProps.scale);
+            ctx.restore();
           }
         }
         
@@ -483,17 +510,28 @@ export const VideoPreview = () => {
     }
     
     // Desenhar a mídia atual (imagem ou vídeo)
-    const imgProps = fitImageToCanvas(media, canvas);
+    const clipProgress = timeInClip / currentClip.duration;
+    const imgProps = fitImageToCanvas(media, canvas, clipProgress, currentClip.duration);
     
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
     ctx.globalAlpha = alpha;
 
-    const scaledWidth = imgProps.drawWidth * currentClip.scale;
-    const scaledHeight = imgProps.drawHeight * currentClip.scale;
-    const offsetX = (canvas.width - scaledWidth) / 2;
+    const scaledWidth = imgProps.drawWidth * currentClip.scale * imgProps.scale;
+    const scaledHeight = imgProps.drawHeight * currentClip.scale * imgProps.scale;
+    const offsetX = (canvas.width - scaledWidth) / 2 + imgProps.panOffsetX;
     const offsetY = (canvas.height - scaledHeight) / 2;
 
-    ctx.drawImage(media, offsetX, offsetY, scaledWidth, scaledHeight);
+    ctx.save();
+    if (imgProps.scale !== 1) {
+      const centerX = offsetX + scaledWidth / 2;
+      const centerY = offsetY + scaledHeight / 2;
+      ctx.translate(centerX, centerY);
+      ctx.scale(imgProps.scale, imgProps.scale);
+      ctx.translate(-centerX, -centerY);
+    }
+    ctx.drawImage(media, offsetX, offsetY, scaledWidth / imgProps.scale, scaledHeight / imgProps.scale);
+    ctx.restore();
+    
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
   };

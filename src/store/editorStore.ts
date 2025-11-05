@@ -66,6 +66,8 @@ export interface GlobalSettings {
   videoFPS: number;
   videoFormat: '16:9' | '9:16' | '1:1';
   mediaFitMode: 'fit-width' | 'fit-height' | 'contain';
+  enablePanEffect: boolean;
+  enableZoomEffect: boolean;
 }
 
 interface EditorState {
@@ -118,6 +120,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     videoFPS: 30,
     videoFormat: '9:16',
     mediaFitMode: 'fit-height',
+    enablePanEffect: true,
+    enableZoomEffect: false,
   },
   projectName: 'Post Imóvel 9:16',
   trackStates: [
