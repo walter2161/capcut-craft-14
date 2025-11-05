@@ -43,42 +43,43 @@ export const ScriptPanel = () => {
       const inicioEscolhido = iniciosCordiais[Math.floor(Math.random() * iniciosCordiais.length)];
       const fimEscolhido = finaisChamada[Math.floor(Math.random() * finaisChamada.length)];
 
-      const prompt = `Crie um roteiro profissional para narração de vídeo sobre este imóvel para redes sociais (TikTok/Instagram Reels):
+      const prompt = `Crie um roteiro profissional para narração de vídeo sobre este imóvel para redes sociais (TikTok/Instagram Reels).
 
-Tipo: ${propertyData.tipo}
-Transação: ${propertyData.transacao}
-Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
-Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
-Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
-${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
-Diferenciais: ${propertyData.diferenciais.join(', ') || 'Imóvel de qualidade'}
+DADOS DO IMÓVEL (USE TODOS ESTES DADOS NO ROTEIRO):
+- Tipo: ${propertyData.tipo}
+- Transação: ${propertyData.transacao}
+- Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
+- Quartos: ${propertyData.quartos}
+- Banheiros: ${propertyData.banheiros}
+- Vagas: ${propertyData.vagas}
+- Área: ${propertyData.area}m²
+- Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
+${propertyData.condominio ? `- Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
+- Diferenciais: ${propertyData.diferenciais.join(', ') || 'Imóvel de qualidade'}
 
-IMPORTANTE: Retorne APENAS o texto da narração, sem títulos, sem marcações como "INÍCIO:", "MEIO:", "FIM:", sem asteriscos, sem formatação. Apenas o texto corrido que será lido pela locutora.
+ESTRUTURA OBRIGATÓRIA DO ROTEIRO:
 
-ESTRUTURA OBRIGATÓRIA:
-
-1. INÍCIO (use exatamente este texto):
+1. INÍCIO (copie exatamente):
 "${inicioEscolhido}"
 
-2. MEIO (desenvolva este conteúdo com 5-7 frases):
-- Apresente o tipo de imóvel e localização específica
-- Destaque as características principais (quartos, banheiros, vagas, área)
-- Mencione o valor de forma atrativa
-- Realce os principais diferenciais do imóvel
-- Use linguagem natural e entusiasmada
+2. MEIO (crie 5-7 frases INCLUINDO OBRIGATORIAMENTE):
+- Mencione o tipo de imóvel (${propertyData.tipo})
+- Fale a localização completa (${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado})
+- Cite TODOS os números: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
+- Mencione o valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
+${propertyData.condominio ? `- Fale do condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
+- Destaque os diferenciais: ${propertyData.diferenciais.join(', ')}
+- Use linguagem natural, entusiasmada e conversacional
 
-3. FIM (use exatamente este texto):
+3. FIM (copie exatamente):
 "${fimEscolhido}"
 
-Características do roteiro:
-- Linguagem clara, natural e conversacional
-- Tom entusiasmado mas profissional
-- Entre 100-130 palavras (para 45-60 segundos de narração)
-- Sem emojis ou hashtags (apenas texto para narração)
-- Frases curtas e diretas
-- Use os dados reais do imóvel fornecidos acima
-- Retorne apenas o texto puro, sem nenhuma formatação ou marcação
-- NÃO repita o início e o fim que já foram fornecidos, apenas use-os nas posições corretas`;
+REGRAS IMPORTANTES:
+- Retorne APENAS o texto corrido, sem títulos, marcações, asteriscos ou formatação
+- OBRIGATÓRIO incluir TODOS os dados técnicos listados acima
+- Entre 100-130 palavras total
+- Sem emojis ou hashtags
+- Tom profissional mas entusiasmado`;
 
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
