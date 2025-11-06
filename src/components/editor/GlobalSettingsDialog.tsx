@@ -159,6 +159,46 @@ export const GlobalSettingsDialog = () => {
           </div>
 
           <div className="space-y-4">
+            <h3 className="text-sm font-medium">Limitador de Tempo</h3>
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Ativar Limitador</Label>
+                <p className="text-xs text-muted-foreground">
+                  Limita o vídeo a um tempo máximo
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={globalSettings.timeLimitEnabled}
+                onChange={(e) =>
+                  updateGlobalSettings({ timeLimitEnabled: e.target.checked })
+                }
+                className="h-4 w-4"
+              />
+            </div>
+
+            {globalSettings.timeLimitEnabled && (
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Tempo Máximo (segundos)</Label>
+                  <span className="text-sm font-semibold">{Math.floor(globalSettings.timeLimit / 1000)}s</span>
+                </div>
+                <Slider
+                  value={[globalSettings.timeLimit / 1000]}
+                  onValueChange={(v) => updateGlobalSettings({ timeLimit: v[0] * 1000 })}
+                  min={10}
+                  max={120}
+                  step={1}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  O vídeo será cortado neste tempo (preview e exportação)
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
             <h3 className="text-sm font-medium">Efeitos de Imagem</h3>
             
             <div className="flex items-center justify-between">

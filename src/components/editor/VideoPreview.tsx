@@ -418,6 +418,12 @@ export const VideoPreview = () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Verificar limitador de tempo
+    const adjustedTime = thumbnailData.enabled ? time - 1000 : time;
+    if (globalSettings.timeLimitEnabled && adjustedTime >= globalSettings.timeLimit) {
+      return; // Não renderizar além do limite
+    }
+
     // Renderizar thumbnail se estiver habilitada e time < 1000ms
     if (thumbnailData.enabled && time < 1000) {
       renderThumbnail(ctx, canvas);

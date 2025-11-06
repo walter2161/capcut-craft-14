@@ -69,6 +69,8 @@ export interface GlobalSettings {
   enablePanEffect: boolean;
   panDirection: 'ping-pong' | 'right' | 'left';
   enableZoomEffect: boolean;
+  timeLimitEnabled: boolean;
+  timeLimit: number;
 }
 
 interface EditorState {
@@ -124,6 +126,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     enablePanEffect: true,
     panDirection: 'ping-pong',
     enableZoomEffect: false,
+    timeLimitEnabled: true,
+    timeLimit: 59000,
   },
   projectName: 'Post Imóvel 9:16',
   trackStates: [

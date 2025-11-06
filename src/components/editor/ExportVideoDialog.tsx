@@ -350,6 +350,11 @@ export const ExportVideoDialog = () => {
 
     // Ajustar tempo se thumbnail estiver habilitada (subtrair 1 segundo)
     const adjustedTime = thumbnailData.enabled ? time - 1000 : time;
+    
+    // Verificar limitador de tempo
+    if (globalSettings.timeLimitEnabled && adjustedTime >= globalSettings.timeLimit) {
+      return; // Não renderizar além do limite
+    }
 
     const videoClips = clips.filter(c => c.track.startsWith('V')).sort((a, b) => a.start - b.start);
     const currentClip = videoClips.find(c => c.start <= adjustedTime && c.start + c.duration > adjustedTime);
@@ -557,7 +562,13 @@ export const ExportVideoDialog = () => {
       const fps = Math.min(60, Math.max(1, Number(globalSettings.videoFPS) || 30));
       // Adicionar 1 segundo se thumbnail estiver habilitada
       const baseDuration = Math.max(totalDuration, 2000);
-      const durationMs = thumbnailData.enabled ? baseDuration + 1000 : baseDuration;
+      let durationMs = thumbnailData.enabled ? baseDuration + 1000 : baseDuration;
+      
+      // Aplicar limitador de tempo se estiver ativo
+      if (globalSettings.timeLimitEnabled) {
+        const maxDuration = thumbnailData.enabled ? globalSettings.timeLimit + 1000 : globalSettings.timeLimit;
+        durationMs = Math.min(durationMs, maxDuration);
+      }
 
       // Criar canvas dedicado para exportação
       const exportCanvas = document.createElement('canvas');
@@ -898,7 +909,16 @@ export const ExportVideoDialog = () => {
             </div>
             <div>
               <p className="text-muted-foreground">Duração</p>
-              <p className="font-semibold">{formatDuration(totalDuration)}</p>
+              <p className="font-semibold">
+                {formatDuration(
+                  globalSettings.timeLimitEnabled && globalSettings.timeLimit < totalDuration
+                    ? globalSettings.timeLimit
+                    : totalDuration
+                )}
+                {globalSettings.timeLimitEnabled && globalSettings.timeLimit < totalDuration && (
+                  <span className="text-xs text-red-500 ml-1">(limitado)</span>
+                )}
+              </p>
             </div>
             <div className="col-span-2">
               <p className="text-muted-foreground">Clipes</p>

@@ -25,7 +25,8 @@ export const Timeline = () => {
     trackStates,
     toggleTrackMute,
     toggleTrackVisibility,
-    addTrackState
+    addTrackState,
+    globalSettings
   } = useEditorStore();
 
   const [tracks, setTracks] = useState(['SUB1', 'V1', 'A1']);
@@ -40,8 +41,13 @@ export const Timeline = () => {
       const animate = (timestamp: number) => {
         const elapsed = timestamp - startTimeRef.current;
         
-        if (elapsed >= totalDuration) {
-          setCurrentTime(totalDuration);
+        // Verificar limite de tempo se estiver ativo
+        const effectiveLimit = globalSettings.timeLimitEnabled 
+          ? globalSettings.timeLimit 
+          : totalDuration;
+        
+        if (elapsed >= effectiveLimit) {
+          setCurrentTime(effectiveLimit);
           setIsPlaying(false);
         } else {
           setCurrentTime(elapsed);
@@ -301,7 +307,16 @@ export const Timeline = () => {
       <div className="h-12 flex items-center justify-center gap-3 px-4 border-b border-border relative">
         <div className="absolute left-4 flex items-center gap-4 text-sm">
           <span>Tempo: <span className="font-mono font-semibold">{formatTime(currentTime)}</span></span>
-          <span>Duração: <span className="font-mono font-semibold">{formatTime(totalDuration)}</span></span>
+          <span>Duração: <span className="font-mono font-semibold">
+            {formatTime(
+              globalSettings.timeLimitEnabled && globalSettings.timeLimit < totalDuration
+                ? globalSettings.timeLimit
+                : totalDuration
+            )}
+            {globalSettings.timeLimitEnabled && globalSettings.timeLimit < totalDuration && (
+              <span className="text-xs text-red-500 ml-1">(limitado)</span>
+            )}
+          </span></span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -530,6 +545,20 @@ export const Timeline = () => {
             onMouseDown={handlePlayheadMouseDown}
           />
         </div>
+
+        {/* Indicador de Limite de Tempo */}
+        {globalSettings.timeLimitEnabled && (
+          <div
+            className="absolute top-0 bottom-0 w-1 bg-red-500/60 z-40 pointer-events-none"
+            style={{
+              left: `${112 + globalSettings.timeLimit / MS_PER_PIXEL}px`,
+            }}
+          >
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-5 text-xs bg-red-500 text-white px-2 py-0.5 rounded whitespace-nowrap">
+              Limite: {Math.floor(globalSettings.timeLimit / 1000)}s
+            </div>
+          </div>
+        )}
       </div>
     </footer>
   );
