@@ -241,7 +241,17 @@ export const VideoPreview = () => {
     let panOffsetX = 0;
     if (globalSettings.enablePanEffect && isHorizontalImage && isVerticalVideo && duration > 0) {
       const maxPan = (drawWidth - canvas.width) * 0.3; // Pan 30% of overflow
-      panOffsetX = -maxPan * Math.sin(progress * Math.PI); // Smooth pan left-right
+      
+      if (globalSettings.panDirection === 'ping-pong') {
+        // Ida e volta: começa à esquerda, vai para direita, volta à esquerda
+        panOffsetX = -maxPan * Math.sin(progress * Math.PI);
+      } else if (globalSettings.panDirection === 'right') {
+        // Somente para a direita: começa à esquerda, termina à direita
+        panOffsetX = -maxPan * (1 - progress * 2);
+      } else if (globalSettings.panDirection === 'left') {
+        // Somente para a esquerda: começa à direita, termina à esquerda
+        panOffsetX = -maxPan * (progress * 2 - 1);
+      }
     }
 
     // Apply zoom effect

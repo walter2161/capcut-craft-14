@@ -67,6 +67,7 @@ export interface GlobalSettings {
   videoFormat: '16:9' | '9:16' | '1:1';
   mediaFitMode: 'fit-width' | 'fit-height' | 'contain';
   enablePanEffect: boolean;
+  panDirection: 'ping-pong' | 'right' | 'left';
   enableZoomEffect: boolean;
 }
 
@@ -121,6 +122,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     videoFormat: '9:16',
     mediaFitMode: 'fit-height',
     enablePanEffect: true,
+    panDirection: 'ping-pong',
     enableZoomEffect: false,
   },
   projectName: 'Post Imóvel 9:16',

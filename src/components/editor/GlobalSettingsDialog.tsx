@@ -178,6 +178,48 @@ export const GlobalSettingsDialog = () => {
               />
             </div>
 
+            {globalSettings.enablePanEffect && (
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Direção do Pan</Label>
+                  <span className="text-sm font-semibold">
+                    {globalSettings.panDirection === 'ping-pong' && 'Ida e Volta'}
+                    {globalSettings.panDirection === 'right' && 'Direita'}
+                    {globalSettings.panDirection === 'left' && 'Esquerda'}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={globalSettings.panDirection === 'ping-pong' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => updateGlobalSettings({ panDirection: 'ping-pong' })}
+                    className="flex-1"
+                  >
+                    Ida/Volta
+                  </Button>
+                  <Button
+                    variant={globalSettings.panDirection === 'right' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => updateGlobalSettings({ panDirection: 'right' })}
+                    className="flex-1"
+                  >
+                    Direita
+                  </Button>
+                  <Button
+                    variant={globalSettings.panDirection === 'left' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => updateGlobalSettings({ panDirection: 'left' })}
+                    className="flex-1"
+                  >
+                    Esquerda
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sentido do movimento horizontal
+                </p>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Efeito de Zoom</Label>
