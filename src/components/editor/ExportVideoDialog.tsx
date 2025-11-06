@@ -374,13 +374,14 @@ export const ExportVideoDialog = () => {
     let currentAlpha = currentClip.opacity;
     let nextAlpha = 0;
     let shouldDrawNext = false;
+    let transitionProgress = 0;
 
     if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
       const transitionStart = currentClip.duration - transitionDuration;
       if (timeInClip >= transitionStart) {
         const transitionTime = timeInClip - transitionStart;
         const rawProgress = Math.min(1, Math.max(0, transitionTime / transitionDuration));
-        const transitionProgress = easeInOutCubic(rawProgress);
+        transitionProgress = easeInOutCubic(rawProgress);
         
         currentAlpha = (1 - transitionProgress) * currentClip.opacity;
         nextAlpha = transitionProgress;
@@ -402,7 +403,7 @@ export const ExportVideoDialog = () => {
             await seekVideo(nextMedia, nextVideoTime);
           }
           if (nextMedia.readyState >= 2) {
-            const nextProgress = 0;
+            const nextProgress = transitionProgress * (transitionDuration / nextClip.duration);
             const nextDuration = nextClip.duration;
             const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             ctx.globalAlpha = nextAlpha;
@@ -425,7 +426,7 @@ export const ExportVideoDialog = () => {
           }
         } else {
           // Imagem
-          const nextProgress = 0;
+          const nextProgress = transitionProgress * (transitionDuration / nextClip.duration);
           const nextDuration = nextClip.duration;
           const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
           ctx.globalAlpha = nextAlpha;
