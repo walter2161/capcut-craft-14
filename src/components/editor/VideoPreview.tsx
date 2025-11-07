@@ -504,7 +504,9 @@ export const VideoPreview = () => {
         if (nextMediaItem) {
           const nextMedia = getDrawable(nextMediaItem as any);
           if (nextMedia) {
-            const nextProgress = transitionProgress;
+            // Progress do próximo clipe baseado no tempo transcorrido nele (não na transição)
+            const nextTimeInClip = transitionTime; // tempo desde o início do próximo clip
+            const nextProgress = Math.min(1, Math.max(0, nextTimeInClip / nextClip.duration));
             const nextDuration = nextClip.duration;
             const nextImgProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             

@@ -399,11 +399,13 @@ export const ExportVideoDialog = () => {
     let nextAlpha = 0;
     let shouldDrawNext = false;
     let transitionProgress = 0;
+    let transitionStart = 0;
+    let transitionTime = 0;
 
     if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
-      const transitionStart = currentClip.duration - transitionDuration;
+      transitionStart = currentClip.duration - transitionDuration;
       if (timeInClip >= transitionStart) {
-        const transitionTime = timeInClip - transitionStart;
+        transitionTime = timeInClip - transitionStart;
         const rawProgress = Math.min(1, Math.max(0, transitionTime / transitionDuration));
         transitionProgress = easeInOutCubic(rawProgress);
         
@@ -427,8 +429,10 @@ export const ExportVideoDialog = () => {
             await seekVideo(nextMedia, nextVideoTime);
           }
           if (nextMedia.readyState >= 2) {
-            // Progress do próximo clipe começa baseado no progresso da transição
-            const nextProgress = transitionProgress;
+            // Progress do próximo clipe baseado no tempo transcorrido nele (não na transição)
+            const transitionTime = timeInClip - transitionStart;
+            const nextTimeInClip = transitionTime; // tempo desde o início do próximo clipe
+            const nextProgress = Math.min(1, Math.max(0, nextTimeInClip / nextClip.duration));
             const nextDuration = nextClip.duration;
             const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             ctx.globalAlpha = nextAlpha;
@@ -450,8 +454,10 @@ export const ExportVideoDialog = () => {
             ctx.restore();
           }
         } else {
-          // Imagem - progress baseado na transição
-          const nextProgress = transitionProgress;
+          // Imagem - progress baseado no tempo transcorrido no próximo clipe
+          const transitionTime = timeInClip - transitionStart;
+          const nextTimeInClip = transitionTime; // tempo desde o início do próximo clipe
+          const nextProgress = Math.min(1, Math.max(0, nextTimeInClip / nextClip.duration));
           const nextDuration = nextClip.duration;
           const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
           ctx.globalAlpha = nextAlpha;
