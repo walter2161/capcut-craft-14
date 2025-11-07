@@ -69,6 +69,7 @@ export interface GlobalSettings {
   enablePanEffect: boolean;
   panDirection: 'ping-pong' | 'right' | 'left';
   enableZoomEffect: boolean;
+  zoomDirection: 'in' | 'out';
   timeLimitEnabled: boolean;
   timeLimit: number;
 }
@@ -126,6 +127,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     enablePanEffect: true,
     panDirection: 'ping-pong',
     enableZoomEffect: false,
+    zoomDirection: 'in',
     timeLimitEnabled: true,
     timeLimit: 59000,
   },

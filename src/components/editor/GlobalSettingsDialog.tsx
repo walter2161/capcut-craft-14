@@ -264,7 +264,7 @@ export const GlobalSettingsDialog = () => {
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Efeito de Zoom</Label>
                 <p className="text-xs text-muted-foreground">
-                  Zoom in/out suave nas imagens
+                  Zoom in/out suave nas imagens do centro
                 </p>
               </div>
               <input
@@ -276,6 +276,39 @@ export const GlobalSettingsDialog = () => {
                 className="h-4 w-4"
               />
             </div>
+
+            {globalSettings.enableZoomEffect && (
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-sm">Direção do Zoom</Label>
+                  <span className="text-sm font-semibold">
+                    {globalSettings.zoomDirection === 'in' && 'Zoom In'}
+                    {globalSettings.zoomDirection === 'out' && 'Zoom Out'}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={globalSettings.zoomDirection === 'in' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => updateGlobalSettings({ zoomDirection: 'in' })}
+                    className="flex-1"
+                  >
+                    Zoom In
+                  </Button>
+                  <Button
+                    variant={globalSettings.zoomDirection === 'out' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => updateGlobalSettings({ zoomDirection: 'out' })}
+                    className="flex-1"
+                  >
+                    Zoom Out
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Aumentar (in) ou diminuir (out) o zoom ao longo do tempo
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

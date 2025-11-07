@@ -96,11 +96,17 @@ export const ExportVideoDialog = () => {
       }
     }
 
-    // Apply zoom effect
+    // Apply zoom effect from center
     let scale = 1;
     if (globalSettings.enableZoomEffect && duration > 0) {
-      const zoomAmount = 0.1;
-      scale = 1 + (zoomAmount * progress);
+      const zoomAmount = 0.15; // 15% zoom
+      if (globalSettings.zoomDirection === 'in') {
+        // Zoom in: começa em 1.0 e vai para 1.15
+        scale = 1 + (zoomAmount * progress);
+      } else {
+        // Zoom out: começa em 1.15 e vai para 1.0
+        scale = 1 + zoomAmount - (zoomAmount * progress);
+      }
     }
     
     return { drawWidth, drawHeight, offsetX, offsetY, panOffsetX, scale };
@@ -369,6 +375,9 @@ export const ExportVideoDialog = () => {
 
     const timeInClip = adjustedTime - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
+    
+    // Calcular progress contínuo do clipe (0 a 1 ao longo da duração total)
+    const clipProgress = Math.min(1, Math.max(0, timeInClip / currentClip.duration));
 
     // Vídeo: sincronizar tempo antes de desenhar
     if (media instanceof HTMLVideoElement) {
@@ -418,7 +427,8 @@ export const ExportVideoDialog = () => {
             await seekVideo(nextMedia, nextVideoTime);
           }
           if (nextMedia.readyState >= 2) {
-            const nextProgress = transitionProgress * (transitionDuration / nextClip.duration);
+            // Progress do próximo clipe começa baseado no progresso da transição
+            const nextProgress = transitionProgress;
             const nextDuration = nextClip.duration;
             const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             ctx.globalAlpha = nextAlpha;
@@ -440,8 +450,8 @@ export const ExportVideoDialog = () => {
             ctx.restore();
           }
         } else {
-          // Imagem
-          const nextProgress = transitionProgress * (transitionDuration / nextClip.duration);
+          // Imagem - progress baseado na transição
+          const nextProgress = transitionProgress;
           const nextDuration = nextClip.duration;
           const nextProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
           ctx.globalAlpha = nextAlpha;
@@ -466,7 +476,6 @@ export const ExportVideoDialog = () => {
     }
 
     // Desenhar clipe atual por cima
-    const clipProgress = timeInClip / currentClip.duration;
     const props = fitImageToCanvas(media, canvas, clipProgress, currentClip.duration);
     ctx.globalAlpha = currentAlpha;
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;

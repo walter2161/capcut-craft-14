@@ -254,11 +254,17 @@ export const VideoPreview = () => {
       }
     }
 
-    // Apply zoom effect
+    // Apply zoom effect from center
     let scale = 1;
     if (globalSettings.enableZoomEffect && duration > 0) {
-      const zoomAmount = 0.1; // 10% zoom
-      scale = 1 + (zoomAmount * progress); // Zoom from 1.0 to 1.1
+      const zoomAmount = 0.15; // 15% zoom
+      if (globalSettings.zoomDirection === 'in') {
+        // Zoom in: começa em 1.0 e vai para 1.15
+        scale = 1 + (zoomAmount * progress);
+      } else {
+        // Zoom out: começa em 1.15 e vai para 1.0
+        scale = 1 + zoomAmount - (zoomAmount * progress);
+      }
     }
     
     return { drawWidth, drawHeight, offsetX, offsetY, panOffsetX, scale };
@@ -454,6 +460,9 @@ export const VideoPreview = () => {
     const timeInClip = time - currentClip.start;
     const transitionDuration = currentClip.transitionDuration || 500;
     
+    // Calcular progress contínuo do clipe (0 a 1 ao longo da duração total)
+    const clipProgress = Math.min(1, Math.max(0, timeInClip / currentClip.duration));
+    
     // Se for vídeo, atualizar o currentTime
     if (mediaItem.type === 'video' && media instanceof HTMLVideoElement) {
       const videoTime = (timeInClip / 1000) * currentClip.speed;
@@ -495,7 +504,7 @@ export const VideoPreview = () => {
         if (nextMediaItem) {
           const nextMedia = getDrawable(nextMediaItem as any);
           if (nextMedia) {
-            const nextProgress = transitionProgress * (transitionDuration / nextClip.duration);
+            const nextProgress = transitionProgress;
             const nextDuration = nextClip.duration;
             const nextImgProps = fitImageToCanvas(nextMedia, canvas, nextProgress, nextDuration);
             
@@ -526,7 +535,6 @@ export const VideoPreview = () => {
     }
     
     // Desenhar a mídia atual (imagem ou vídeo)
-    const clipProgress = timeInClip / currentClip.duration;
     const imgProps = fitImageToCanvas(media, canvas, clipProgress, currentClip.duration);
     
     ctx.filter = `brightness(${100 + currentClip.brightness}%) contrast(${100 + currentClip.contrast}%)`;
