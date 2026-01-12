@@ -20,9 +20,12 @@ const VideoEditor = () => {
       const bathrooms = propertyData.banheiros ? `${propertyData.banheiros}` : '';
       const area = propertyData.area ? `${propertyData.area}` : '';
       
-      // Formatar preço
+      // Formatar preço - inteligente para entrada e valor total
       let price = '';
-      if (propertyData.valor) {
+      if (propertyData.valorEntrada && propertyData.valor) {
+        // Se tem entrada, mostrar entrada destacada
+        price = `Entrada R$ ${propertyData.valorEntrada.toLocaleString('pt-BR')}`;
+      } else if (propertyData.valor) {
         if (propertyData.transacao === 'Venda') {
           price = `R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
         } else {
