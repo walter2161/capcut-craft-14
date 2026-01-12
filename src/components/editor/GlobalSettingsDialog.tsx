@@ -212,6 +212,27 @@ export const GlobalSettingsDialog = () => {
 
           <TabsContent value="effects" className="space-y-6 mt-4 max-h-[50vh] overflow-y-auto pr-2">
             <div className="space-y-4">
+              <h3 className="text-sm font-medium">Transição</h3>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Efeito de Transição</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cross-fade suave entre clipes
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={globalSettings.enableTransition}
+                  onChange={(e) =>
+                    updateGlobalSettings({ enableTransition: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
               <h3 className="text-sm font-medium">Efeitos de Imagem</h3>
               
               <div className="flex items-center justify-between">
