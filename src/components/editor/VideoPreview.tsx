@@ -491,8 +491,8 @@ export const VideoPreview = () => {
     
     let alpha = currentClip.opacity;
     
-    // Lógica de transição cross-fade
-    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
+    // Lógica de transição cross-fade (apenas se transições estão habilitadas)
+    if (globalSettings.enableTransition && nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
       const transitionStart = currentClip.duration - transitionDuration;
       
       if (timeInClip >= transitionStart) {
@@ -504,7 +504,8 @@ export const VideoPreview = () => {
         if (nextMediaItem) {
           const nextMedia = getDrawable(nextMediaItem as any);
           if (nextMedia) {
-            // Progress do próximo clipe baseado no tempo transcorrido nele (não na transição)
+            // Progress do próximo clipe: continua de onde o efeito parou durante a transição
+            // O próximo clipe começa seu efeito de pan/zoom do início (0), não de onde o atual parou
             const nextTimeInClip = transitionTime; // tempo desde o início do próximo clip
             const nextProgress = Math.min(1, Math.max(0, nextTimeInClip / nextClip.duration));
             const nextDuration = nextClip.duration;

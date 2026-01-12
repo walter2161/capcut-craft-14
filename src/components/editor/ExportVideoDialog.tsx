@@ -402,7 +402,7 @@ export const ExportVideoDialog = () => {
     let transitionStart = 0;
     let transitionTime = 0;
 
-    if (nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
+    if (globalSettings.enableTransition && nextClip && (currentClip.transition === 'cross-fade' || !currentClip.transition)) {
       transitionStart = currentClip.duration - transitionDuration;
       if (timeInClip >= transitionStart) {
         transitionTime = timeInClip - transitionStart;
