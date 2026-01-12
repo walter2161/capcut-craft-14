@@ -69,7 +69,7 @@ export const PropertyScanner = () => {
     let condoPrice: number | undefined;
     
     // Coletar todos os preços com seus contextos
-    const pricesFound: { price: number; context: string; element: Element }[] = [];
+    const pricesFound: { price: number; context: string; isEntradaExplicita: boolean; isTotalExplicito: boolean }[] = [];
     
     for (const priceEl of allPriceElements) {
       const priceText = priceEl.textContent || '';
@@ -81,39 +81,40 @@ export const PropertyScanner = () => {
           if (numMatch) {
             const price = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'));
             if (price > 0) {
-              // Pegar contexto mais amplo (texto ao redor)
-              const parentText = priceEl.parentElement?.textContent || '';
-              const grandParentText = priceEl.parentElement?.parentElement?.textContent || '';
-              const context = (grandParentText + ' ' + parentText + ' ' + priceText).toLowerCase();
-              pricesFound.push({ price, context, element: priceEl });
+              // Pegar contexto RESTRITO (apenas o elemento e pai imediato)
+              const elementText = priceEl.textContent?.toLowerCase() || '';
+              const parentText = priceEl.parentElement?.textContent?.toLowerCase() || '';
+              const context = parentText + ' ' + elementText;
+              
+              // Verificar palavras-chave EXPLÍCITAS para entrada
+              const isEntradaExplicita = 
+                context.includes('entrada:') || 
+                context.includes('entrada de') ||
+                context.includes('entrada r$') ||
+                context.includes('sinal:') ||
+                context.includes('sinal de') ||
+                (context.includes('partir de') && context.includes('entrada'));
+              
+              // Verificar palavras-chave EXPLÍCITAS para valor total
+              const isTotalExplicito = 
+                context.includes('total:') || 
+                context.includes('valor total') ||
+                context.includes('valor do imóvel') ||
+                context.includes('valor do imovel') ||
+                context.includes('preço:') ||
+                context.includes('preco:') ||
+                context.includes('venda:') ||
+                context.includes('valor:');
+              
+              pricesFound.push({ price, context, isEntradaExplicita, isTotalExplicito });
             }
           }
         }
       }
     }
     
-    // Identificar os tipos de preço baseado no contexto
+    // Primeiro: identificar condomínio (valores pequenos com contexto específico)
     for (const { price, context } of pricesFound) {
-      // Palavras-chave para valor de entrada
-      const isEntrada = context.includes('entrada') || 
-                        context.includes('sinal') || 
-                        context.includes('down payment') ||
-                        context.includes('à vista') ||
-                        context.includes('a vista') ||
-                        (context.includes('partir de') && !context.includes('total'));
-      
-      // Palavras-chave para valor total
-      const isTotal = context.includes('total') || 
-                      context.includes('valor do imóvel') ||
-                      context.includes('valor do imovel') ||
-                      context.includes('preço total') ||
-                      context.includes('preco total') ||
-                      context.includes('valor venda') ||
-                      context.includes('valor de venda') ||
-                      context.includes('financiado') ||
-                      context.includes('financiamento');
-      
-      // Palavras-chave para condomínio
       const isCondo = context.includes('condomínio') || 
                       context.includes('condominio') || 
                       context.includes('cond.') ||
@@ -121,45 +122,51 @@ export const PropertyScanner = () => {
       
       if (isCondo && price < 10000 && !condoPrice) {
         condoPrice = price;
-      } else if (isEntrada && !entryPrice) {
+        break;
+      }
+    }
+    
+    // Segundo: identificar entrada APENAS se explicitamente mencionado
+    for (const { price, isEntradaExplicita } of pricesFound) {
+      if (isEntradaExplicita && price > 1000 && price !== condoPrice && !entryPrice) {
         entryPrice = price;
-      } else if (isTotal && price > 10000 && !salePrice) {
-        salePrice = price;
+        break;
       }
     }
     
-    // Se encontramos dois valores significativos (> 10000), determinar qual é entrada e qual é total
-    const significantPrices = pricesFound
-      .filter(p => p.price > 10000 && p.price !== condoPrice)
-      .map(p => p.price)
-      .filter((v, i, a) => a.indexOf(v) === i) // unique
-      .sort((a, b) => a - b); // ordenar do menor para o maior
-    
-    if (significantPrices.length >= 2 && !salePrice && !entryPrice) {
-      // Se há dois valores significativos e não identificamos por contexto,
-      // assumir que o menor é entrada e o maior é o valor total
-      entryPrice = significantPrices[0];
-      salePrice = significantPrices[significantPrices.length - 1];
-    } else if (significantPrices.length === 1 && !salePrice) {
-      // Apenas um valor significativo encontrado
-      salePrice = significantPrices[0];
-    }
-    
-    // Se ainda não temos valor de venda, pegar o maior preço encontrado
-    if (!salePrice) {
-      const maxPrice = Math.max(...pricesFound.map(p => p.price).filter(p => p !== condoPrice && p !== entryPrice));
-      if (maxPrice > 0) {
-        salePrice = maxPrice;
+    // Terceiro: identificar valor total
+    // Se encontramos entrada explícita, procurar por valor total explícito também
+    if (entryPrice) {
+      for (const { price, isTotalExplicito } of pricesFound) {
+        if (isTotalExplicito && price > entryPrice && price !== condoPrice && !salePrice) {
+          salePrice = price;
+          break;
+        }
+      }
+      
+      // Se não encontrou total explícito, pegar o maior valor (que não seja entrada ou condomínio)
+      if (!salePrice) {
+        const candidates = pricesFound
+          .filter(p => p.price > 10000 && p.price !== condoPrice && p.price !== entryPrice)
+          .map(p => p.price);
+        if (candidates.length > 0) {
+          salePrice = Math.max(...candidates);
+        }
+      }
+    } else {
+      // Sem entrada identificada, pegar o maior valor significativo como preço de venda
+      const candidates = pricesFound
+        .filter(p => p.price > 10000 && p.price !== condoPrice)
+        .map(p => p.price);
+      if (candidates.length > 0) {
+        salePrice = Math.max(...candidates);
       }
     }
     
-    // Verificação de sanidade: entrada deve ser menor que o valor total
+    // Verificação final: entrada deve ser MENOR que o valor total
     if (entryPrice && salePrice && entryPrice >= salePrice) {
-      // Se entrada >= total, provavelmente identificamos errado
-      // O maior é o total, o menor é a entrada
-      const temp = salePrice;
-      salePrice = entryPrice;
-      entryPrice = temp;
+      // Entrada maior ou igual ao total não faz sentido - ignorar entrada
+      entryPrice = undefined;
     }
     
     data.valor = salePrice || 0;
