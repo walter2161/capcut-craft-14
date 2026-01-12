@@ -129,7 +129,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     panDirection: 'ping-pong',
     enableZoomEffect: false,
     zoomDirection: 'in',
-    enableTransition: true,
+    enableTransition: false,
     timeLimitEnabled: true,
     timeLimit: 59000,
   },
