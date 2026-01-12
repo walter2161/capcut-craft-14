@@ -20,6 +20,7 @@ export interface PropertyData {
   
   // Valores
   valor: number;
+  valorEntrada?: number; // Valor de entrada (se houver)
   condominio?: number;
   iptu?: number;
   
@@ -53,6 +54,7 @@ const defaultProperty: PropertyData = {
   vagas: 1,
   area: 50,
   valor: 0,
+  valorEntrada: undefined,
   diferenciais: [],
   descricaoAdicional: '',
   nomeCorretor: '',

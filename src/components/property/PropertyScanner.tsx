@@ -61,54 +61,109 @@ export const PropertyScanner = () => {
       }
     });
 
-    // Extrair preço - buscar especificamente valor de venda e condomínio
-    const allPriceElements = doc.querySelectorAll('.price, .valor, .preco, [class*="price"], [class*="valor"], td, tr');
+    // Extrair preços - identificar valor total, entrada e condomínio
+    const allPriceElements = doc.querySelectorAll('.price, .valor, .preco, [class*="price"], [class*="valor"], td, tr, span, p, div');
     
     let salePrice: number | undefined;
+    let entryPrice: number | undefined;
     let condoPrice: number | undefined;
+    
+    // Coletar todos os preços com seus contextos
+    const pricesFound: { price: number; context: string; element: Element }[] = [];
     
     for (const priceEl of allPriceElements) {
       const priceText = priceEl.textContent || '';
-      const context = (priceEl.parentElement?.textContent || '') + ' ' + priceText;
-      const contextLower = context.toLowerCase();
+      const priceMatch = priceText.match(/R\$\s*([\d.,]+)/g);
       
-      // Verificar se é valor de condomínio
-      if (contextLower.includes('condomínio') || contextLower.includes('condominio') || contextLower.includes('cond.')) {
-        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
-        if (priceMatch && !condoPrice) {
-          condoPrice = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
-        }
-      }
-      // Verificar se é valor de venda/aluguel
-      else if (contextLower.includes('venda') || contextLower.includes('aluguel') || 
-               contextLower.includes('sale') || contextLower.includes('valor total') ||
-               priceEl.tagName === 'TD' && priceEl.classList.contains('Value')) {
-        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
-        if (priceMatch && !salePrice) {
-          const price = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
-          // Valor de venda geralmente é maior que condomínio
-          if (price > 10000) {
-            salePrice = price;
+      if (priceMatch) {
+        for (const match of priceMatch) {
+          const numMatch = match.match(/R\$\s*([\d.,]+)/);
+          if (numMatch) {
+            const price = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'));
+            if (price > 0) {
+              // Pegar contexto mais amplo (texto ao redor)
+              const parentText = priceEl.parentElement?.textContent || '';
+              const grandParentText = priceEl.parentElement?.parentElement?.textContent || '';
+              const context = (grandParentText + ' ' + parentText + ' ' + priceText).toLowerCase();
+              pricesFound.push({ price, context, element: priceEl });
+            }
           }
         }
       }
     }
     
-    // Se não encontrou valor específico de venda, pegar o maior preço encontrado
-    if (!salePrice) {
-      for (const priceEl of allPriceElements) {
-        const priceText = priceEl.textContent || '';
-        const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
-        if (priceMatch) {
-          const price = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
-          if (!salePrice || price > salePrice) {
-            salePrice = price;
-          }
-        }
+    // Identificar os tipos de preço baseado no contexto
+    for (const { price, context } of pricesFound) {
+      // Palavras-chave para valor de entrada
+      const isEntrada = context.includes('entrada') || 
+                        context.includes('sinal') || 
+                        context.includes('down payment') ||
+                        context.includes('à vista') ||
+                        context.includes('a vista') ||
+                        (context.includes('partir de') && !context.includes('total'));
+      
+      // Palavras-chave para valor total
+      const isTotal = context.includes('total') || 
+                      context.includes('valor do imóvel') ||
+                      context.includes('valor do imovel') ||
+                      context.includes('preço total') ||
+                      context.includes('preco total') ||
+                      context.includes('valor venda') ||
+                      context.includes('valor de venda') ||
+                      context.includes('financiado') ||
+                      context.includes('financiamento');
+      
+      // Palavras-chave para condomínio
+      const isCondo = context.includes('condomínio') || 
+                      context.includes('condominio') || 
+                      context.includes('cond.') ||
+                      context.includes('taxa mensal');
+      
+      if (isCondo && price < 10000 && !condoPrice) {
+        condoPrice = price;
+      } else if (isEntrada && !entryPrice) {
+        entryPrice = price;
+      } else if (isTotal && price > 10000 && !salePrice) {
+        salePrice = price;
       }
+    }
+    
+    // Se encontramos dois valores significativos (> 10000), determinar qual é entrada e qual é total
+    const significantPrices = pricesFound
+      .filter(p => p.price > 10000 && p.price !== condoPrice)
+      .map(p => p.price)
+      .filter((v, i, a) => a.indexOf(v) === i) // unique
+      .sort((a, b) => a - b); // ordenar do menor para o maior
+    
+    if (significantPrices.length >= 2 && !salePrice && !entryPrice) {
+      // Se há dois valores significativos e não identificamos por contexto,
+      // assumir que o menor é entrada e o maior é o valor total
+      entryPrice = significantPrices[0];
+      salePrice = significantPrices[significantPrices.length - 1];
+    } else if (significantPrices.length === 1 && !salePrice) {
+      // Apenas um valor significativo encontrado
+      salePrice = significantPrices[0];
+    }
+    
+    // Se ainda não temos valor de venda, pegar o maior preço encontrado
+    if (!salePrice) {
+      const maxPrice = Math.max(...pricesFound.map(p => p.price).filter(p => p !== condoPrice && p !== entryPrice));
+      if (maxPrice > 0) {
+        salePrice = maxPrice;
+      }
+    }
+    
+    // Verificação de sanidade: entrada deve ser menor que o valor total
+    if (entryPrice && salePrice && entryPrice >= salePrice) {
+      // Se entrada >= total, provavelmente identificamos errado
+      // O maior é o total, o menor é a entrada
+      const temp = salePrice;
+      salePrice = entryPrice;
+      entryPrice = temp;
     }
     
     data.valor = salePrice || 0;
+    data.valorEntrada = entryPrice;
     data.condominio = condoPrice;
 
     // Extrair endereço/localização
@@ -235,6 +290,14 @@ export const PropertyScanner = () => {
 
   const generateCopyWithAI = async (propertyData: Partial<PropertyData>) => {
     try {
+      // Construir texto de valores inteligente
+      let valorTexto = '';
+      if (propertyData.valorEntrada && propertyData.valor) {
+        valorTexto = `Entrada: R$ ${propertyData.valorEntrada.toLocaleString('pt-BR')} | Valor Total: R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
+      } else if (propertyData.valor) {
+        valorTexto = `R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
+      }
+
       const prompt = `Com base nas informações do imóvel abaixo, crie uma copy persuasiva e atraente para um post de rede social (Instagram/TikTok):
 
 Tipo: ${propertyData.tipo || 'Imóvel'}
@@ -242,7 +305,8 @@ Transação: ${propertyData.transacao || 'Venda'}
 Referência: ${propertyData.referencia || ''}
 Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
 Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas${propertyData.area ? `, ${propertyData.area}m²` : ''}
-Valor: R$ ${propertyData.valor?.toLocaleString('pt-BR')}
+${valorTexto ? `Valores: ${valorTexto}` : ''}
+${propertyData.valorEntrada ? `IMPORTANTE: Este imóvel tem valor de entrada de R$ ${propertyData.valorEntrada.toLocaleString('pt-BR')} - destaque isso como facilidade de pagamento!` : ''}
 ${propertyData.diferenciais && propertyData.diferenciais.length > 0 ? `Diferenciais: ${propertyData.diferenciais.join(', ')}` : ''}
 ${propertyData.descricaoAdicional ? `Descrição: ${propertyData.descricaoAdicional}` : ''}
 
@@ -250,6 +314,7 @@ A copy deve:
 - Ser curta e impactante (máximo 150 palavras)
 - Usar emojis estrategicamente
 - Destacar os principais diferenciais
+${propertyData.valorEntrada ? '- DESTACAR que aceita entrada facilitada e o valor da entrada' : ''}
 - Incluir código de referência (REF: ${propertyData.referencia || ''})
 - Criar senso de urgência
 - Incluir call-to-action forte
@@ -279,9 +344,15 @@ A copy deve:
       const bairro = propertyData.bairro || '';
       const tipo = propertyData.tipo || 'Imóvel';
       const transacao = propertyData.transacao || 'Venda';
-      const valor = propertyData.valor
-        ? `por R$ ${propertyData.valor.toLocaleString('pt-BR')}`
-        : '';
+      
+      // Construir texto de valor inteligente para fallback
+      let valorText = '';
+      if (propertyData.valorEntrada && propertyData.valor) {
+        valorText = `💰 Entrada: R$ ${propertyData.valorEntrada.toLocaleString('pt-BR')}\n💵 Valor Total: R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
+      } else if (propertyData.valor) {
+        valorText = `por R$ ${propertyData.valor.toLocaleString('pt-BR')}`;
+      }
+      
       const caracts = [
         propertyData.quartos ? `${propertyData.quartos} quartos` : null,
         propertyData.banheiros ? `${propertyData.banheiros} banheiros` : null,
@@ -295,8 +366,12 @@ A copy deve:
         ? `Destaques: ${propertyData.diferenciais.slice(0, 5).join(', ')}.\n`
         : '';
 
+      const entradaDestaque = propertyData.valorEntrada 
+        ? `\n\n🎯 ENTRADA FACILITADA!`
+        : '';
+
       const ref = propertyData.referencia ? `\n\n📋 REF: ${propertyData.referencia}` : '';
-      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲${ref}\n\n#imoveis #${cidade.toLowerCase()}`;
+      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}\n${valorText}${entradaDestaque}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲${ref}\n\n#imoveis #${cidade.toLowerCase()}`;
       return fallback;
     }
   };
@@ -367,6 +442,7 @@ A copy deve:
         vagas: extractedData.vagas || 1,
         area: extractedData.area || 50,
         valor: extractedData.valor || 0,
+        valorEntrada: extractedData.valorEntrada,
         diferenciais: extractedData.diferenciais || [],
         descricaoAdicional: extractedData.descricaoAdicional || '',
         nomeCorretor: extractedData.nomeCorretor || '',

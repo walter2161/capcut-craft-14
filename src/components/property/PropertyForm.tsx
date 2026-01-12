@@ -142,14 +142,24 @@ export const PropertyForm = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div>
-            <Label>Valor (R$)</Label>
+            <Label>Valor Total (R$)</Label>
             <Input 
               type="number" 
               value={propertyData?.valor} 
               onChange={(e) => updateField('valor', parseFloat(e.target.value) || 0)}
               min="0"
+            />
+          </div>
+          <div>
+            <Label>Entrada (R$)</Label>
+            <Input 
+              type="number" 
+              value={propertyData?.valorEntrada || ''} 
+              onChange={(e) => updateField('valorEntrada', parseFloat(e.target.value) || undefined)}
+              min="0"
+              placeholder="Opcional"
             />
           </div>
           <div>
@@ -171,6 +181,15 @@ export const PropertyForm = () => {
             />
           </div>
         </div>
+
+        {/* Indicador visual quando há valor de entrada */}
+        {propertyData?.valorEntrada && propertyData.valorEntrada > 0 && (
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              💰 Este imóvel aceita entrada facilitada de R$ {propertyData.valorEntrada.toLocaleString('pt-BR')}
+            </p>
+          </div>
+        )}
 
         <div className="mb-4">
           <Label>Diferenciais</Label>
