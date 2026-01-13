@@ -222,27 +222,29 @@ export const PropertyForm = () => {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3 border-t pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-4">
           <div>
-            <Label>Nome do Corretor</Label>
+            <Label>Imobiliária / Corretor</Label>
             <Input 
-              value={propertyData?.nomeCorretor}
+              value={propertyData?.nomeCorretor || ''}
               onChange={(e) => updateField('nomeCorretor', e.target.value)}
+              placeholder="Vendebens Imóveis"
             />
           </div>
           <div>
             <Label>Telefone</Label>
             <Input 
-              value={propertyData?.telefoneCorretor}
+              value={propertyData?.telefoneCorretor || ''}
               onChange={(e) => updateField('telefoneCorretor', e.target.value)}
               placeholder="(11) 99999-9999"
             />
           </div>
           <div>
-            <Label>CRECI (opcional)</Label>
+            <Label>CRECI</Label>
             <Input 
               value={propertyData?.creci || ''}
               onChange={(e) => updateField('creci', e.target.value)}
+              placeholder="CRECI: 25571-J"
             />
           </div>
         </div>
