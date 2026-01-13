@@ -57,8 +57,9 @@ const defaultProperty: PropertyData = {
   valorEntrada: undefined,
   diferenciais: [],
   descricaoAdicional: '',
-  nomeCorretor: '',
+  nomeCorretor: 'Vendebens Imóveis',
   telefoneCorretor: '',
+  creci: 'CRECI: 25571-J',
 };
 
 export const usePropertyStore = create<PropertyState>((set) => {
