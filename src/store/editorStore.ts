@@ -45,6 +45,7 @@ export interface ThumbnailData {
   area: string;
   location: string;
   referencia: string;
+  creci: string; // CRECI para exibir no rodapé
   // Configurações visuais
   cardBgColor: string;
   cardBgOpacity: number;
@@ -148,6 +149,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     area: '',
     location: '',
     referencia: '',
+    creci: 'CRECI: 25571-J', // Valor padrão
     // Valores padrão para configurações visuais
     cardBgColor: '#ffffff',
     cardBgOpacity: 0.95,

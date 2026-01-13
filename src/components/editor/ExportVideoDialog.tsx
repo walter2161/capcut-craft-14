@@ -251,6 +251,17 @@ export const ExportVideoDialog = () => {
       ctx.fillText(titleUpper, contentX + contentWidth / 2, currentY);
     }
 
+    // CRECI no rodapé (parte inferior da imagem)
+    if (thumbnailData.creci) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = `500 ${baseFontSize * 0.55}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(thumbnailData.creci, canvas.width / 2, canvas.height - (baseFontSize * 0.6));
+    }
+
     // Resetar shadow
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;

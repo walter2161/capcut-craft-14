@@ -29,12 +29,14 @@ Referência: ${propertyData.referencia || ''}
 Localização: ${propertyData.bairro}, ${propertyData.cidade}/${propertyData.estado}
 Características: ${propertyData.quartos} quartos, ${propertyData.banheiros} banheiros, ${propertyData.vagas} vagas, ${propertyData.area}m²
 Valor: R$ ${propertyData.valor.toLocaleString('pt-BR')}
+${propertyData.valorEntrada ? `Entrada: R$ ${propertyData.valorEntrada.toLocaleString('pt-BR')}` : ''}
 ${propertyData.condominio ? `Condomínio: R$ ${propertyData.condominio.toLocaleString('pt-BR')}` : ''}
 Diferenciais: ${propertyData.diferenciais.join(', ') || 'Nenhum informado'}
 ${propertyData.descricaoAdicional ? `Observações: ${propertyData.descricaoAdicional}` : ''}
 
-Corretor: ${propertyData.nomeCorretor}
+Corretor/Imobiliária: ${propertyData.nomeCorretor}
 Contato: ${propertyData.telefoneCorretor}
+${propertyData.creci ? `CRECI: ${propertyData.creci}` : ''}
 
 A copy deve:
 - Ser curta e impactante (máximo 150 palavras)
@@ -43,6 +45,7 @@ A copy deve:
 - Incluir código de referência (REF: ${propertyData.referencia || ''})
 - Criar senso de urgência
 - Incluir call-to-action forte
+- OBRIGATÓRIO: Incluir o CRECI (${propertyData.creci || 'CRECI: 25571-J'}) no final da copy
 - Incluir hashtags relevantes (#imoveis #${propertyData.cidade.toLowerCase()})`;
 
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -93,7 +96,8 @@ A copy deve:
         : '';
 
       const ref = propertyData.referencia ? `\n\n📋 REF: ${propertyData.referencia}` : '';
-      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲${ref}\n\n#imoveis #${cidade.toLowerCase()}`;
+      const creci = propertyData.creci || 'CRECI: 25571-J';
+      const fallback = `✨ ${tipo} para ${transacao} em ${bairro} · ${cidade}\n\n${caracts}${valor ? ` \u2014 ${valor}` : ''}\n${difs}\nCorra! Oportunidade única com excelente localização. Fale agora e agende sua visita! 📲${ref}\n\n${creci}\n\n#imoveis #${cidade.toLowerCase()}`;
       setGeneratedCopy(fallback);
       toast.success('Copy gerada (fallback)');
     } finally {

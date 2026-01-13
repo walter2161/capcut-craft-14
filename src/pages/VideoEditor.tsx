@@ -51,7 +51,8 @@ const VideoEditor = () => {
         bathrooms,
         area,
         location,
-        referencia: propertyData.referencia || ''
+        referencia: propertyData.referencia || '',
+        creci: propertyData.creci || 'CRECI: 25571-J'
       });
     }
   }, [propertyData, updateThumbnailData]);
